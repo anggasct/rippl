@@ -26,16 +26,18 @@ One-time setup:
 
 ```bash
 make install-tools   # golangci-lint
-make setup-hooks     # pre-commit hook → runs `make check`
+make setup-hooks     # pre-commit hook → runs `make check-fast` (gofmt + vet)
 ```
 
-Run the same checks as GitHub Actions before you commit:
+Run the full CI-equivalent checks before you push:
 
 ```bash
-make check
+make check           # same as GitHub Actions
 ```
 
-Individual targets: `make test`, `make lint`, `make vet`, `make fmt`, `make build`.
+Pre-commit runs a fast subset (`gofmt` + `go vet`); CI runs the full suite.
+
+Individual targets: `make check-fast`, `make test`, `make lint`, `make vet`, `make fmt`, `make build`.
 
 ## Verify
 

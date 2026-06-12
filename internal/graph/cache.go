@@ -104,11 +104,11 @@ func IsValid(cachedMTimes, currentMTimes map[string]int64) bool {
 func CollectMTimes(moduleRoot string, files []string) (map[string]int64, error) {
 	out := make(map[string]int64, len(files))
 	for _, rel := range files {
-		abs := rel
-		if !filepath.IsAbs(abs) {
-			abs = filepath.Join(moduleRoot, rel)
+		path := rel
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(moduleRoot, rel)
 		}
-		info, err := os.Stat(abs)
+		info, err := os.Stat(path)
 		if err != nil {
 			return nil, fmt.Errorf("stat %q: %w", rel, err)
 		}

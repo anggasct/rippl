@@ -1,4 +1,4 @@
-.PHONY: all check test lint vet fmt fmt-check build install-tools setup-hooks
+.PHONY: all check check-fast test lint vet fmt fmt-check build install-tools setup-hooks
 
 GOBIN := $(CURDIR)/bin
 GOFILES := $(shell find . -name '*.go' -not -path './vendor/*')
@@ -8,6 +8,9 @@ all: check
 
 check:
 	@./scripts/check.sh
+
+# Fast subset for pre-commit; full make check runs in CI.
+check-fast: fmt-check vet
 
 test:
 	go test -race -count=1 ./...
@@ -36,4 +39,4 @@ install-tools:
 
 setup-hooks:
 	git config core.hooksPath .githooks
-	@echo "Git hooks path set to .githooks (pre-commit runs: make check)"
+	@echo "Git hooks path set to .githooks (pre-commit runs: make check-fast)"
