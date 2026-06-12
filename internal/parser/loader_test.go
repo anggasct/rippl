@@ -22,6 +22,8 @@ func TestLoadModuleFiles(t *testing.T) {
 		"pkg/alpha/alpha.go",
 		"pkg/beta/beta.go",
 		"pkg/beta/beta_test.go",
+		"pkg/beta/helper.go",
+		"pkg/gamma/gamma.go",
 	}
 	if len(paths) != len(want) {
 		t.Fatalf("files = %#v, want %#v", paths, want)
@@ -32,7 +34,11 @@ func TestLoadModuleFiles(t *testing.T) {
 		}
 	}
 
-	for _, excluded := range []string{"pkg/mock_foo.go", "vendor/example.com/vendorpkg/vendor.go"} {
+	for _, excluded := range []string{
+		"pkg/mock_foo.go",
+		"pkg/beta/beta_string.go",
+		"vendor/example.com/vendorpkg/vendor.go",
+	} {
 		if containsPath(paths, excluded) {
 			t.Fatalf("unexpected ignored file in scope: %q", excluded)
 		}
@@ -50,6 +56,7 @@ func TestMatchesIgnore(t *testing.T) {
 		{path: "vendor/foo.go", want: true},
 		{path: "pkg/mock_foo.go", want: true},
 		{path: "pkg/foo_string.go", want: true},
+		{path: "pkg/beta/beta_string.go", want: true},
 		{path: "pkg/alpha/alpha.go", want: false},
 	}
 

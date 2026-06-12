@@ -22,14 +22,24 @@ func TestExtractImportsAndExports(t *testing.T) {
 	if !ok {
 		t.Fatal("missing beta analysis")
 	}
+	gamma, ok := byPath["pkg/gamma/gamma.go"]
+	if !ok {
+		t.Fatal("missing gamma analysis")
+	}
 
 	if !containsPath(edgeTargets(alpha.Imports, EdgeImport), "pkg/beta/beta.go") {
 		t.Fatalf("alpha imports = %#v, want edge to pkg/beta/beta.go", alpha.Imports)
+	}
+	if !containsPath(edgeTargets(beta.Imports, EdgeImport), "pkg/gamma/gamma.go") {
+		t.Fatalf("beta imports = %#v, want edge to pkg/gamma/gamma.go", beta.Imports)
 	}
 	if !hasExport(beta.Exports, "Foo", "func") {
 		t.Fatalf("beta exports = %#v, want Foo func", beta.Exports)
 	}
 	if !hasExport(beta.Exports, "Type", "type") {
 		t.Fatalf("beta exports = %#v, want Type type", beta.Exports)
+	}
+	if !hasExport(gamma.Exports, "Bar", "func") {
+		t.Fatalf("gamma exports = %#v, want Bar func", gamma.Exports)
 	}
 }

@@ -8,23 +8,9 @@ import (
 	"github.com/anggasct/rippl/internal/config"
 )
 
-type Parser interface {
-	ParseModule(ctx context.Context, moduleRoot string, cfg *config.Config) ([]FileAnalysis, error)
-}
-
-type moduleParser struct{}
-
-func NewParser() Parser {
-	return moduleParser{}
-}
-
 // ParseModule parses all in-scope Go files under moduleRoot.
 // cfg.Ignore controls glob exclusions; uses go/packages per ADR-006.
 func ParseModule(ctx context.Context, moduleRoot string, cfg *config.Config) ([]FileAnalysis, error) {
-	return NewParser().ParseModule(ctx, moduleRoot, cfg)
-}
-
-func (moduleParser) ParseModule(ctx context.Context, moduleRoot string, cfg *config.Config) ([]FileAnalysis, error) {
 	if cfg == nil {
 		cfg = config.DefaultConfig()
 	}

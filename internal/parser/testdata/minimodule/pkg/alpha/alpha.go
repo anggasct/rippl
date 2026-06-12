@@ -6,4 +6,11 @@ var x beta.Type
 
 func Run() {
 	beta.Foo()
+	var t beta.Type
+	t.Method()
+	self()
+}
+
+func self() {
+	self()
 }

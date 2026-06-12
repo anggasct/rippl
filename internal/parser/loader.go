@@ -3,7 +3,6 @@ package parser
 import (
 	"context"
 	"fmt"
-	"go/token"
 	"path/filepath"
 	"sort"
 
@@ -26,7 +25,6 @@ type fileRef struct {
 
 type loadedModule struct {
 	moduleRoot string
-	fset       *token.FileSet
 	pkgs       []*packages.Package
 	files      []fileRef
 }
@@ -58,7 +56,6 @@ func loadModule(ctx context.Context, moduleRoot string, ignorePatterns []string)
 
 	loaded := &loadedModule{
 		moduleRoot: moduleRoot,
-		fset:       token.NewFileSet(),
 		pkgs:       pkgs,
 	}
 

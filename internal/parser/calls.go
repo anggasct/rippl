@@ -5,6 +5,7 @@ import (
 	"go/token"
 	"go/types"
 
+	"golang.org/x/tools/go/ast/astutil"
 	"golang.org/x/tools/go/types/typeutil"
 )
 
@@ -27,6 +28,8 @@ func extractCallsAndTypeRefs(mod *loadedModule, byPath map[string]*FileAnalysis)
 				continue
 			}
 
+			parents := parentMap(syntaxFile)
+
 			ast.Inspect(syntaxFile, func(node ast.Node) bool {
 				switch n := node.(type) {
 				case *ast.CallExpr:
@@ -34,6 +37,9 @@ func extractCallsAndTypeRefs(mod *loadedModule, byPath map[string]*FileAnalysis)
 						addObjectEdge(mod, analysis.Path, fn, EdgeCall, callSeen)
 					}
 				case *ast.SelectorExpr:
+					if call, ok := parents[n].(*ast.CallExpr); ok && call.Fun == n {
+						break
+					}
 					if obj := objectForSelector(file.pkg.TypesInfo, n); obj != nil {
 						switch obj.(type) {
 						case *types.TypeName, *types.Var, *types.Const, *types.Func:
@@ -48,6 +54,19 @@ func extractCallsAndTypeRefs(mod *loadedModule, byPath map[string]*FileAnalysis)
 		analysis.Calls = sortedEdges(callSeen)
 		analysis.TypeRefs = sortedEdges(typeRefSeen)
 	}
+}
+
+func parentMap(file *ast.File) map[ast.Node]ast.Node {
+	parents := make(map[ast.Node]ast.Node)
+	astutil.Apply(file, nil, func(c *astutil.Cursor) bool {
+		if node := c.Node(); node != nil {
+			if parent := c.Parent(); parent != nil {
+				parents[node] = parent
+			}
+		}
+		return true
+	})
+	return parents
 }
 
 func objectForSelector(info *types.Info, sel *ast.SelectorExpr) types.Object {

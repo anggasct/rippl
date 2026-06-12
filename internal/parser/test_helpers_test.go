@@ -1,21 +1,35 @@
 package parser
 
 import (
+	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/anggasct/rippl/internal/config"
 )
 
-func minimoduleRoot(t *testing.T) string {
+func repoRoot(t *testing.T) string {
 	t.Helper()
 
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("runtime.Caller failed")
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
 	}
-	return filepath.Clean(filepath.Join(filepath.Dir(file), "testdata", "minimodule"))
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatal("repo root not found")
+		}
+		dir = parent
+	}
+}
+
+func minimoduleRoot(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(repoRoot(t), "internal", "parser", "testdata", "minimodule")
 }
 
 func defaultTestConfig() *config.Config {

@@ -13,8 +13,8 @@ func TestParseModuleIntegration(t *testing.T) {
 		t.Fatalf("ParseModule() error = %v", err)
 	}
 
-	if len(analyses) != 3 {
-		t.Fatalf("len(analyses) = %d, want 3", len(analyses))
+	if len(analyses) != 5 {
+		t.Fatalf("len(analyses) = %d, want 5", len(analyses))
 	}
 
 	for _, analysis := range analyses {
