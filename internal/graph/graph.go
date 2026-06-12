@@ -42,6 +42,8 @@ func Build(analyses []parser.FileAnalysis) *Graph {
 	return g
 }
 
+// File-level graph only: edges with empty TargetFile (stdlib/external) and same-file
+// targets are omitted by design.
 func addParserEdges(g *Graph, source string, edges []parser.Edge) {
 	for _, edge := range edges {
 		if edge.TargetFile == "" || edge.TargetFile == source {

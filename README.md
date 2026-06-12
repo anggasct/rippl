@@ -37,7 +37,7 @@ make check           # same as GitHub Actions
 
 Pre-commit runs a fast subset (`gofmt` + `go vet`); CI runs the full suite.
 
-Individual targets: `make check-fast`, `make test`, `make lint`, `make vet`, `make fmt`, `make build`.
+Individual targets: `make check-fast`, `make bench-graph`, `make test`, `make lint`, `make vet`, `make fmt`, `make build`.
 
 ## Verify
 

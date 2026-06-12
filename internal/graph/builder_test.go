@@ -2,6 +2,7 @@ package graph
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,21 +15,42 @@ func TestLoadOrBuildUsesCache(t *testing.T) {
 	cacheDir := filepath.Join(t.TempDir(), ".rippl", "cache")
 	cfg := config.DefaultConfig()
 	cfg.Cache.Dir = cacheDir
-
 	ctx := context.Background()
 
-	first, err := LoadOrBuild(ctx, moduleRoot, cfg, false)
-	if err != nil {
-		t.Fatalf("LoadOrBuild() first error = %v", err)
+	if _, err := LoadOrBuild(ctx, moduleRoot, cfg, false); err != nil {
+		t.Fatalf("warm cache: %v", err)
 	}
 
-	second, err := LoadOrBuild(ctx, moduleRoot, cfg, false)
-	if err != nil {
-		t.Fatalf("LoadOrBuild() second error = %v", err)
+	gomod := filepath.Join(moduleRoot, "go.mod")
+	backup := gomod + ".bak"
+	if err := os.Rename(gomod, backup); err != nil {
+		t.Fatalf("Rename(go.mod) error = %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Rename(backup, gomod)
+	})
+
+	if _, err := LoadOrBuild(ctx, moduleRoot, cfg, false); err != nil {
+		t.Fatalf("LoadOrBuild(cache hit) error = %v, want success without go.mod", err)
+	}
+}
+
+func TestLoadOrBuildRespectsContextOnCacheHit(t *testing.T) {
+	moduleRoot := minimoduleRoot(t)
+	cacheDir := filepath.Join(t.TempDir(), ".rippl", "cache")
+	cfg := config.DefaultConfig()
+	cfg.Cache.Dir = cacheDir
+	ctx := context.Background()
+
+	if _, err := LoadOrBuild(ctx, moduleRoot, cfg, false); err != nil {
+		t.Fatalf("warm cache: %v", err)
 	}
 
-	if len(first.Files()) != len(second.Files()) {
-		t.Fatalf("first files = %#v, second = %#v", first.Files(), second.Files())
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+
+	if _, err := LoadOrBuild(cancelled, moduleRoot, cfg, false); !errors.Is(err, context.Canceled) {
+		t.Fatalf("LoadOrBuild() error = %v, want context.Canceled", err)
 	}
 }
 
@@ -60,7 +82,6 @@ func TestLoadOrBuildNoCacheBypassesRead(t *testing.T) {
 	if err := os.WriteFile(target, modified, 0o644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
-	// Restore mtime so the on-disk cache entry remains valid while content changed.
 	if err := os.Chtimes(target, info.ModTime(), info.ModTime()); err != nil {
 		t.Fatalf("Chtimes() error = %v", err)
 	}
@@ -123,24 +144,39 @@ func TestLoadOrBuildNoCacheSkipsWrite(t *testing.T) {
 	}
 }
 
-func BenchmarkLoadOrBuildCached(b *testing.B) {
+func BenchmarkLoadOrBuild(b *testing.B) {
 	root, err := filepath.Abs(mustMinimoduleRootPath(b))
 	if err != nil {
 		b.Fatalf("Abs() error = %v", err)
 	}
-	cacheDir := filepath.Join(b.TempDir(), ".rippl", "cache")
 	cfg := config.DefaultConfig()
-	cfg.Cache.Dir = cacheDir
 	ctx := context.Background()
 
-	if _, err := LoadOrBuild(ctx, root, cfg, false); err != nil {
-		b.Fatalf("warm cache: %v", err)
-	}
+	b.Run("cold", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			b.StopTimer()
+			cacheDir := filepath.Join(b.TempDir(), ".rippl", "cache")
+			cfg.Cache.Dir = cacheDir
+			b.StartTimer()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		if _, err := LoadOrBuild(ctx, root, cfg, false); err != nil {
-			b.Fatalf("LoadOrBuild() error = %v", err)
+			if _, err := LoadOrBuild(ctx, root, cfg, true); err != nil {
+				b.Fatalf("LoadOrBuild(cold) error = %v", err)
+			}
 		}
-	}
+	})
+
+	b.Run("cached", func(b *testing.B) {
+		cacheDir := filepath.Join(b.TempDir(), ".rippl", "cache")
+		cfg.Cache.Dir = cacheDir
+		if _, err := LoadOrBuild(ctx, root, cfg, false); err != nil {
+			b.Fatalf("warm cache: %v", err)
+		}
+
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			if _, err := LoadOrBuild(ctx, root, cfg, false); err != nil {
+				b.Fatalf("LoadOrBuild(cached) error = %v", err)
+			}
+		}
+	})
 }

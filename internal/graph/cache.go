@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"context"
 	"encoding/gob"
 	"fmt"
 	"os"
@@ -59,7 +60,11 @@ func Save(moduleRoot, cacheDir string, g *Graph, mtimes map[string]int64) error 
 	return nil
 }
 
-func Load(moduleRoot, cacheDir string) (*Graph, map[string]int64, error) {
+func Load(ctx context.Context, moduleRoot, cacheDir string) (*Graph, map[string]int64, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+
 	path, err := cachePath(moduleRoot, cacheDir)
 	if err != nil {
 		return nil, nil, err
@@ -77,6 +82,9 @@ func Load(moduleRoot, cacheDir string) (*Graph, map[string]int64, error) {
 	var entry cacheEntry
 	if err := gob.NewDecoder(file).Decode(&entry); err != nil {
 		return nil, nil, fmt.Errorf("decode cache: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
 	}
 	if entry.Version != cacheVersion {
 		return nil, nil, fmt.Errorf("cache miss: unsupported version %d", entry.Version)
@@ -101,9 +109,12 @@ func IsValid(cachedMTimes, currentMTimes map[string]int64) bool {
 	return true
 }
 
-func CollectMTimes(moduleRoot string, files []string) (map[string]int64, error) {
+func CollectMTimes(ctx context.Context, moduleRoot string, files []string) (map[string]int64, error) {
 	out := make(map[string]int64, len(files))
 	for _, rel := range files {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		path := rel
 		if !filepath.IsAbs(path) {
 			path = filepath.Join(moduleRoot, rel)

@@ -1,4 +1,4 @@
-.PHONY: all check check-fast test lint vet fmt fmt-check build install-tools setup-hooks
+.PHONY: all check check-fast test lint vet fmt fmt-check build install-tools setup-hooks bench-graph
 
 GOBIN := $(CURDIR)/bin
 GOFILES := $(shell find . -name '*.go' -not -path './vendor/*')
@@ -29,6 +29,9 @@ fmt-check:
 
 build:
 	go build -o bin/rippl ./cmd/rippl
+
+bench-graph:
+	go test ./internal/graph/... -bench=BenchmarkLoadOrBuild -count=1 -run=^$$
 
 $(GOLANGCI):
 	@$(MAKE) install-tools

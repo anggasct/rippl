@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,12 +10,13 @@ import (
 
 func TestCacheSaveLoadAndValidate(t *testing.T) {
 	t.Parallel()
+	ctx := context.Background()
 
 	moduleRoot := minimoduleRoot(t)
 	cacheDir := t.TempDir()
 
 	g := Build(parseMinimodule(t))
-	mtimes, err := CollectMTimes(moduleRoot, g.Files())
+	mtimes, err := CollectMTimes(ctx, moduleRoot, g.Files())
 	if err != nil {
 		t.Fatalf("CollectMTimes() error = %v", err)
 	}
@@ -23,12 +25,12 @@ func TestCacheSaveLoadAndValidate(t *testing.T) {
 		t.Fatalf("Save() error = %v", err)
 	}
 
-	loaded, loadedMTimes, err := Load(moduleRoot, cacheDir)
+	loaded, loadedMTimes, err := Load(ctx, moduleRoot, cacheDir)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
 
-	current, err := CollectMTimes(moduleRoot, loaded.Files())
+	current, err := CollectMTimes(ctx, moduleRoot, loaded.Files())
 	if err != nil {
 		t.Fatalf("CollectMTimes() error = %v", err)
 	}
@@ -51,6 +53,7 @@ func TestIsValidDetectsNewerMtime(t *testing.T) {
 }
 
 func TestCacheInvalidatesAfterFileTouch(t *testing.T) {
+	ctx := context.Background()
 	moduleRoot := minimoduleRoot(t)
 	target := filepath.Join(moduleRoot, "pkg", "beta", "beta.go")
 
@@ -58,13 +61,17 @@ func TestCacheInvalidatesAfterFileTouch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatalf("Stat() error = %v", err)
+	}
 	t.Cleanup(func() {
 		_ = os.WriteFile(target, orig, 0o644)
 	})
 
 	cacheDir := t.TempDir()
 	g := Build(parseMinimodule(t))
-	mtimes, err := CollectMTimes(moduleRoot, g.Files())
+	mtimes, err := CollectMTimes(ctx, moduleRoot, g.Files())
 	if err != nil {
 		t.Fatalf("CollectMTimes() error = %v", err)
 	}
@@ -72,16 +79,19 @@ func TestCacheInvalidatesAfterFileTouch(t *testing.T) {
 		t.Fatalf("Save() error = %v", err)
 	}
 
-	time.Sleep(10 * time.Millisecond)
+	newer := info.ModTime().Add(time.Second)
 	if err := os.WriteFile(target, append(orig, '\n'), 0o644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
+	if err := os.Chtimes(target, newer, newer); err != nil {
+		t.Fatalf("Chtimes() error = %v", err)
+	}
 
-	loaded, loadedMTimes, err := Load(moduleRoot, cacheDir)
+	loaded, loadedMTimes, err := Load(ctx, moduleRoot, cacheDir)
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	current, err := CollectMTimes(moduleRoot, loaded.Files())
+	current, err := CollectMTimes(ctx, moduleRoot, loaded.Files())
 	if err != nil {
 		t.Fatalf("CollectMTimes() error = %v", err)
 	}
