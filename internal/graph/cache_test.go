@@ -1,0 +1,101 @@
+package graph
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+)
+
+func TestCacheSaveLoadAndValidate(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	moduleRoot := minimoduleRoot(t)
+	cacheDir := t.TempDir()
+
+	g := Build(parseMinimodule(t))
+	mtimes, err := CollectMTimes(ctx, moduleRoot, g.Files())
+	if err != nil {
+		t.Fatalf("CollectMTimes() error = %v", err)
+	}
+
+	if err := Save(moduleRoot, cacheDir, g, mtimes); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	loaded, loadedMTimes, err := Load(ctx, moduleRoot, cacheDir)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	current, err := CollectMTimes(ctx, moduleRoot, loaded.Files())
+	if err != nil {
+		t.Fatalf("CollectMTimes() error = %v", err)
+	}
+	if !IsValid(loadedMTimes, current) {
+		t.Fatal("expected cached mtimes to be valid")
+	}
+	if len(loaded.Files()) != len(g.Files()) {
+		t.Fatalf("loaded files = %#v, want %#v", loaded.Files(), g.Files())
+	}
+}
+
+func TestIsValidDetectsNewerMtime(t *testing.T) {
+	t.Parallel()
+
+	cached := map[string]int64{"pkg/a.go": time.Now().Add(-time.Hour).UnixNano()}
+	current := map[string]int64{"pkg/a.go": time.Now().UnixNano()}
+	if IsValid(cached, current) {
+		t.Fatal("IsValid() = true, want false for newer mtime")
+	}
+}
+
+func TestCacheInvalidatesAfterFileTouch(t *testing.T) {
+	ctx := context.Background()
+	moduleRoot := minimoduleRoot(t)
+	target := filepath.Join(moduleRoot, "pkg", "beta", "beta.go")
+
+	orig, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatalf("Stat() error = %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.WriteFile(target, orig, 0o644)
+	})
+
+	cacheDir := t.TempDir()
+	g := Build(parseMinimodule(t))
+	mtimes, err := CollectMTimes(ctx, moduleRoot, g.Files())
+	if err != nil {
+		t.Fatalf("CollectMTimes() error = %v", err)
+	}
+	if err := Save(moduleRoot, cacheDir, g, mtimes); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	newer := info.ModTime().Add(time.Second)
+	if err := os.WriteFile(target, append(orig, '\n'), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	if err := os.Chtimes(target, newer, newer); err != nil {
+		t.Fatalf("Chtimes() error = %v", err)
+	}
+
+	loaded, loadedMTimes, err := Load(ctx, moduleRoot, cacheDir)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	current, err := CollectMTimes(ctx, moduleRoot, loaded.Files())
+	if err != nil {
+		t.Fatalf("CollectMTimes() error = %v", err)
+	}
+	if IsValid(loadedMTimes, current) {
+		t.Fatal("IsValid() = true, want false after file touch")
+	}
+}
