@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -61,6 +62,8 @@ func loadModule(ctx context.Context, moduleRoot string, ignorePatterns []string)
 
 	seen := make(map[string]fileRef)
 	for _, pkg := range pkgs {
+		// MVP policy: any typecheck error in a loaded package (including a broken *_test.go)
+		// aborts the entire module parse.
 		if pkg.IllTyped && len(pkg.Errors) > 0 {
 			return nil, fmt.Errorf("typecheck %s: %s", pkg.PkgPath, pkg.Errors[0].Msg)
 		}
@@ -99,11 +102,15 @@ func loadModule(ctx context.Context, moduleRoot string, ignorePatterns []string)
 	return loaded, nil
 }
 
-func sourceFiles(pkg *packages.Package) []string {
+func compiledGoFiles(pkg *packages.Package) []string {
 	if len(pkg.CompiledGoFiles) > 0 {
-		return append([]string{}, pkg.CompiledGoFiles...)
+		return pkg.CompiledGoFiles
 	}
-	return append([]string{}, pkg.GoFiles...)
+	return pkg.GoFiles
+}
+
+func sourceFiles(pkg *packages.Package) []string {
+	return append([]string{}, compiledGoFiles(pkg)...)
 }
 
 func (m *loadedModule) pkgByPath() map[string]*packages.Package {
@@ -119,8 +126,11 @@ func (m *loadedModule) pkgByPath() map[string]*packages.Package {
 
 // packageSourceFiles returns non-test compiled source paths for import edge targets.
 func packageSourceFiles(moduleRoot string, pkg *packages.Package, ignorePatterns []string) []string {
-	paths := make([]string, 0, len(pkg.GoFiles))
-	for _, absPath := range pkg.GoFiles {
+	paths := make([]string, 0, len(compiledGoFiles(pkg)))
+	for _, absPath := range compiledGoFiles(pkg) {
+		if strings.HasSuffix(absPath, "_test.go") {
+			continue
+		}
 		relPath, err := filepath.Rel(moduleRoot, absPath)
 		if err != nil {
 			continue
