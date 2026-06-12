@@ -18,12 +18,14 @@ const (
 )
 
 type AffectedFile struct {
-	Path        string
-	Depth       int
-	Level       ImpactLevel
-	Chain       []string
-	Reason      parser.EdgeType
-	RiskScore   int
+	Path   string
+	Depth  int
+	Level  ImpactLevel
+	Chain  []string
+	Reason parser.EdgeType
+	// TODO(cap-904): populate RiskScore via risk scorer.
+	RiskScore int
+	// TODO(cap-905): populate HasTestFile via test mapper.
 	HasTestFile bool
 }
 
@@ -79,10 +81,9 @@ func analyzeImpact(g *Graph, sourcePath string, opts impactOptions) (*ImpactResu
 	}
 
 	type queueItem struct {
-		path   string
-		depth  int
-		chain  []string
-		reason parser.EdgeType
+		path  string
+		depth int
+		chain []string
 	}
 
 	queue := []queueItem{{path: sourcePath, depth: 0, chain: []string{sourcePath}}}
@@ -121,10 +122,9 @@ func analyzeImpact(g *Graph, sourcePath string, opts impactOptions) (*ImpactResu
 			})
 
 			queue = append(queue, queueItem{
-				path:   next,
-				depth:  depth,
-				chain:  chain,
-				reason: edge.Type,
+				path:  next,
+				depth: depth,
+				chain: chain,
 			})
 		}
 	}
@@ -135,6 +135,8 @@ func analyzeImpact(g *Graph, sourcePath string, opts impactOptions) (*ImpactResu
 
 func impactLevel(depth int) ImpactLevel {
 	switch depth {
+	case 0:
+		return ImpactSource
 	case 1:
 		return ImpactDirect
 	default:
@@ -151,6 +153,7 @@ func sortAffected(files []AffectedFile) {
 		if files[i].Depth != files[j].Depth {
 			return files[i].Depth < files[j].Depth
 		}
+		// risk sort pending CAP-904 (FR-I04); path tiebreaker until RiskScore is wired.
 		return files[i].Path < files[j].Path
 	})
 }

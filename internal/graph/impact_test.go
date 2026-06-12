@@ -145,7 +145,7 @@ func TestAnalyzeImpactSortOrder(t *testing.T) {
 	}
 }
 
-func TestAnalyzeImpactFromConfigIncludeTests(t *testing.T) {
+func TestAnalyzeImpactFromConfigExcludeTests(t *testing.T) {
 	t.Parallel()
 
 	g := testGraph(t)
@@ -161,6 +161,23 @@ func TestAnalyzeImpactFromConfigIncludeTests(t *testing.T) {
 		if isTestFile(file.Path) {
 			t.Fatalf("affected includes test file %q with IncludeTests=false", file.Path)
 		}
+	}
+}
+
+func TestAnalyzeImpactFromConfigIncludeTests(t *testing.T) {
+	t.Parallel()
+
+	g := testGraph(t)
+	cfg := config.DefaultConfig()
+	cfg.Impact.IncludeTests = true
+
+	result, err := AnalyzeImpactFromConfig(g, "pkg/beta/beta.go", cfg)
+	if err != nil {
+		t.Fatalf("AnalyzeImpactFromConfig() error = %v", err)
+	}
+
+	if _, ok := affectedByPath(t, result)["pkg/beta/beta_test.go"]; !ok {
+		t.Fatal("expected pkg/beta/beta_test.go in affected set with IncludeTests=true")
 	}
 }
 
