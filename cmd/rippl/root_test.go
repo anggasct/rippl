@@ -92,6 +92,9 @@ func TestGraphInModuleCreatesCacheDir(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(moduleRoot, "go.mod"), []byte("module example.com/test\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(moduleRoot, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	origWD, err := os.Getwd()
 	if err != nil {
