@@ -10,6 +10,8 @@ import (
 	"github.com/anggasct/rippl/internal/config"
 	"github.com/anggasct/rippl/internal/graph"
 	"github.com/anggasct/rippl/internal/render"
+	"github.com/anggasct/rippl/internal/scorer"
+	"github.com/anggasct/rippl/internal/testmap"
 	"github.com/spf13/cobra"
 )
 
@@ -48,7 +50,38 @@ func newAnalyzeCmd() *cobra.Command {
 				return &config.ExitError{Code: 2, Err: err}
 			}
 
-			out := buildOutput(cfg, moduleRoot, result)
+			// Collect risk scores and coverage for source + affected files.
+			allFiles := make([]string, 0, len(result.Affected)+1)
+			allFiles = append(allFiles, result.Source.Path)
+			for _, f := range result.Affected {
+				allFiles = append(allFiles, f.Path)
+			}
+
+			coverageInfo, err := testmap.MapFileTests(g, allFiles, "")
+			if err != nil {
+				return fmt.Errorf("collect coverage: %w", err)
+			}
+			coverage := testmap.ToScorerCoverage(coverageInfo)
+			testmap.ApplyToImpact(result, coverageInfo)
+
+			riskScores, err := scorer.NewHeuristic().ScoreFiles(
+				cmd.Context(),
+				moduleRoot,
+				g,
+				allFiles,
+				coverage,
+				cfg,
+			)
+			if err != nil {
+				return fmt.Errorf("score files: %w", err)
+			}
+			scoreMap := make(map[string]int, len(riskScores))
+			for path, fr := range riskScores {
+				scoreMap[path] = fr.Score
+			}
+			graph.ApplyRiskScores(result, scoreMap)
+
+			out := buildOutput(cfg, moduleRoot, result, riskScores, coverageInfo)
 			return renderOutput(cmd, cfg, out)
 		},
 	}
@@ -83,17 +116,23 @@ func resolveModuleRoot(fileArg string) (string, error) {
 	return root, nil
 }
 
-func buildOutput(cfg *config.Config, moduleRoot string, result *graph.ImpactResult) render.Output {
+func buildOutput(cfg *config.Config, moduleRoot string, result *graph.ImpactResult, riskScores map[string]scorer.FileRisk, coverageInfo map[string]testmap.FileCoverage) render.Output {
 	now := time.Now().UTC()
 
+	srcRisk := riskScores[result.Source.Path]
+	srcCov := coverageInfo[result.Source.Path]
+
 	out := render.Output{
-		Version:   version,
-		Command:   "analyze",
-		Module:    moduleRoot,
-		Generated: now,
+		Version:    version,
+		Command:    "analyze",
+		SourceFile: result.Source.Path,
+		Module:     moduleRoot,
+		Generated:  now,
 		Source: render.SourceOutput{
 			Path:      result.Source.Path,
 			RiskScore: result.Source.RiskScore,
+			RiskBand:  string(srcRisk.Band),
+			Coverage:  coveragePct(srcCov),
 		},
 	}
 
@@ -104,11 +143,16 @@ func buildOutput(cfg *config.Config, moduleRoot string, result *graph.ImpactResu
 
 	for _, f := range result.Affected {
 		level := string(f.Level)
+		fRisk := riskScores[f.Path]
+		fCov := coverageInfo[f.Path]
+
 		out.Files = append(out.Files, render.FileOutput{
 			Path:        f.Path,
 			ImpactLevel: level,
 			Depth:       f.Depth,
 			RiskScore:   f.RiskScore,
+			RiskBand:    string(fRisk.Band),
+			Coverage:    coveragePct(fCov),
 			HasTestFile: f.HasTestFile,
 			Chain:       f.Chain,
 			Reason:      string(f.Reason),
@@ -136,6 +180,13 @@ func buildOutput(cfg *config.Config, moduleRoot string, result *graph.ImpactResu
 	}
 
 	return out
+}
+
+func coveragePct(fc testmap.FileCoverage) float64 {
+	if fc.CoveragePct != nil {
+		return *fc.CoveragePct
+	}
+	return 0
 }
 
 func renderOutput(cmd *cobra.Command, cfg *config.Config, out render.Output) error {
