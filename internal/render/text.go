@@ -102,8 +102,12 @@ type mermaidRenderer struct {
 }
 
 func (r *mermaidRenderer) Render(ctx context.Context, out Output) error {
-	fmt.Fprintln(r.out, "flowchart TD")
-	fmt.Fprintf(r.out, "    source[%s]\n", mermaidNode(out.Source.Path))
+	if _, err := fmt.Fprintln(r.out, "flowchart TD"); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(r.out, "    source[%s]\n", mermaidNode(out.Source.Path)); err != nil {
+		return err
+	}
 
 	for i, f := range out.Files {
 		select {
@@ -113,8 +117,12 @@ func (r *mermaidRenderer) Render(ctx context.Context, out Output) error {
 		}
 
 		nodeID := fmt.Sprintf("n%d", i)
-		fmt.Fprintf(r.out, "    %s[%s]\n", nodeID, mermaidNode(f.Path))
-		fmt.Fprintf(r.out, "    source --> %s\n", nodeID)
+		if _, err := fmt.Fprintf(r.out, "    %s[%s]\n", nodeID, mermaidNode(f.Path)); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(r.out, "    source --> %s\n", nodeID); err != nil {
+			return err
+		}
 	}
 
 	return nil
