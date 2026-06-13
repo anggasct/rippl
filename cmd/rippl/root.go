@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -93,6 +94,8 @@ func prepareRuntime(cmd *cobra.Command, args []string, flags *cliFlags) error {
 		return &config.ExitError{Code: 1, Err: err}
 	}
 
+	cmd.SetContext(context.WithValue(cmd.Context(), configKey, cfg))
+
 	return nil
 }
 
@@ -131,4 +134,17 @@ func commandUsesFileArg(name string) bool {
 
 func printNotImplemented(cmd *cobra.Command) {
 	_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "not implemented")
+}
+
+type ctxKey string
+
+const configKey ctxKey = "config"
+
+func configForCmd(cmd *cobra.Command) *config.Config {
+	if v := cmd.Context().Value(configKey); v != nil {
+		if cfg, ok := v.(*config.Config); ok {
+			return cfg
+		}
+	}
+	return config.DefaultConfig()
 }
