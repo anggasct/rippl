@@ -18,12 +18,11 @@ const (
 )
 
 type AffectedFile struct {
-	Path   string
-	Depth  int
-	Level  ImpactLevel
-	Chain  []string
-	Reason parser.EdgeType
-	// TODO(cap-904): populate RiskScore via risk scorer.
+	Path      string
+	Depth     int
+	Level     ImpactLevel
+	Chain     []string
+	Reason    parser.EdgeType
 	RiskScore int
 	// TODO(cap-905): populate HasTestFile via test mapper.
 	HasTestFile bool
@@ -133,6 +132,22 @@ func analyzeImpact(g *Graph, sourcePath string, opts impactOptions) (*ImpactResu
 	return result, nil
 }
 
+// ApplyRiskScores sets RiskScore on the source and affected files from scores, then re-sorts affected.
+func ApplyRiskScores(result *ImpactResult, scores map[string]int) {
+	if result == nil {
+		return
+	}
+	if score, ok := scores[result.Source.Path]; ok {
+		result.Source.RiskScore = score
+	}
+	for i := range result.Affected {
+		if score, ok := scores[result.Affected[i].Path]; ok {
+			result.Affected[i].RiskScore = score
+		}
+	}
+	sortAffected(result.Affected)
+}
+
 func impactLevel(depth int) ImpactLevel {
 	switch depth {
 	case 0:
@@ -153,7 +168,9 @@ func sortAffected(files []AffectedFile) {
 		if files[i].Depth != files[j].Depth {
 			return files[i].Depth < files[j].Depth
 		}
-		// risk sort pending CAP-904 (FR-I04); path tiebreaker until RiskScore is wired.
+		if files[i].RiskScore != files[j].RiskScore {
+			return files[i].RiskScore > files[j].RiskScore
+		}
 		return files[i].Path < files[j].Path
 	})
 }
