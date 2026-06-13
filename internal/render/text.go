@@ -7,6 +7,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"github.com/anggasct/rippl/internal/tui"
 )
 
 // NewRenderer creates a Renderer for the given format string.
@@ -19,13 +21,19 @@ func NewRenderer(format string) (Renderer, error) {
 
 // NewRendererWithWriter creates a Renderer for the given format string that writes to w.
 func NewRendererWithWriter(format string, w io.Writer) (Renderer, error) {
+	return NewRendererWithWriterAndColor(format, w, false)
+}
+
+// NewRendererWithWriterAndColor creates a Renderer with explicit noColor control.
+// Used by callers that need to disable ANSI colors (e.g. --no-color flag).
+func NewRendererWithWriterAndColor(format string, w io.Writer, noColor bool) (Renderer, error) {
 	switch Format(strings.ToLower(format)) {
 	case FormatJSON:
 		return &jsonRenderer{out: w}, nil
 	case FormatMermaid:
 		return &mermaidRenderer{out: w}, nil
 	case FormatTUI:
-		return &tuiRenderer{out: w}, nil
+		return &tuiRenderer{out: w, noColor: noColor}, nil
 	case FormatText, "":
 		return &textRenderer{out: w}, nil
 	default:
@@ -132,17 +140,31 @@ func mermaidNode(path string) string {
 	return strings.ReplaceAll(path, ".", "_")
 }
 
-// tuiRenderer is a placeholder for the TUI renderer (WP-02).
+// tuiRenderer runs an interactive Bubble Tea TUI for browsing affected files.
 type tuiRenderer struct {
-	out io.Writer
+	out     io.Writer
+	noColor bool
 }
 
 func (r *tuiRenderer) Render(ctx context.Context, out Output) error {
-	return ErrTUINotImplemented
+	tuiOut := tui.TUIOutput{
+		Title: fmt.Sprintf("rippl — %s", out.Source.Path),
+		Files: make([]tui.FileEntry, 0, len(out.Files)),
+	}
+	for _, f := range out.Files {
+		tuiOut.Files = append(tuiOut.Files, tui.FileEntry{
+			Path:        f.Path,
+			ImpactLevel: f.ImpactLevel,
+			Depth:       f.Depth,
+			RiskScore:   f.RiskScore,
+			Coverage:    f.Coverage,
+			HasTestFile: f.HasTestFile,
+			Chain:       f.Chain,
+			Reason:      f.Reason,
+		})
+	}
+	return tui.Run(ctx, tuiOut, r.noColor)
 }
-
-// ErrTUINotImplemented is returned when the selected format has no concrete renderer yet.
-var ErrTUINotImplemented = fmt.Errorf("tui renderer not implemented")
 
 // Interface satisfaction checks.
 var (
