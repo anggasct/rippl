@@ -206,3 +206,25 @@ func TestAnalyzeImpactReasonUsesParserEdgeType(t *testing.T) {
 		t.Fatalf("beta reason = %q, want parser edge type", beta.Reason)
 	}
 }
+
+func TestApplyRiskScoresSortsByRiskDescending(t *testing.T) {
+	t.Parallel()
+
+	result := &ImpactResult{
+		Source: AffectedFile{Path: "source.go", Level: ImpactSource, Depth: 0},
+		Affected: []AffectedFile{
+			{Path: "z.go", Level: ImpactIndirect, Depth: 2, RiskScore: 0},
+			{Path: "a.go", Level: ImpactIndirect, Depth: 2, RiskScore: 0},
+		},
+	}
+	ApplyRiskScores(result, map[string]int{
+		"z.go": 10,
+		"a.go": 90,
+	})
+	if result.Affected[0].Path != "a.go" || result.Affected[0].RiskScore != 90 {
+		t.Fatalf("first = %#v, want a.go risk 90", result.Affected[0])
+	}
+	if result.Affected[1].Path != "z.go" || result.Affected[1].RiskScore != 10 {
+		t.Fatalf("second = %#v, want z.go risk 10", result.Affected[1])
+	}
+}
