@@ -45,8 +45,8 @@ func TestGraphFilesSorted(t *testing.T) {
 
 	g := Build(parseMinimodule(t))
 	files := g.Files()
-	if len(files) != 5 {
-		t.Fatalf("files = %#v, want 5 entries", files)
+	if len(files) != 6 {
+		t.Fatalf("files = %#v, want 6 entries", files)
 	}
 	for i := 1; i < len(files); i++ {
 		if files[i-1] >= files[i] {

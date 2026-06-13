@@ -32,7 +32,8 @@ type FileRisk struct {
 }
 
 // CoverageMap maps file paths to coverage percentage (0–100).
-// A nil map value means coverage is unknown (neutral signal until CAP-905).
+// nil value means coverage unknown (test exists, no profile); missing keys are treated as unknown.
+// CAP-905 sets explicit 0.0 for files with no associated test.
 type CoverageMap map[string]*float64
 
 type RiskScorer interface {
