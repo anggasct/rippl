@@ -8,10 +8,10 @@ import (
 
 // GraphExport represents the full dependency graph for serialization.
 type GraphExport struct {
-	Module  string           `json:"module"`
-	Nodes   []NodeExport     `json:"nodes"`
-	Edges   []EdgeExport     `json:"edges"`
-	Package string           `json:"package,omitempty"`
+	Module  string       `json:"module"`
+	Nodes   []NodeExport `json:"nodes"`
+	Edges   []EdgeExport `json:"edges"`
+	Package string       `json:"package,omitempty"`
 }
 
 type NodeExport struct {

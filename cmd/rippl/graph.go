@@ -18,7 +18,7 @@ func newGraphCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "graph",
 		Short: "Export full dependency graph",
-		Long: "Export the full module dependency graph as Mermaid or JSON.\nUse --package to filter to a subgraph.",
+		Long:  "Export the full module dependency graph as Mermaid or JSON.\nUse --package to filter to a subgraph.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := configForCmd(cmd)
