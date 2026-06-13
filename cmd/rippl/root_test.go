@@ -118,3 +118,75 @@ func TestGraphInModuleCreatesCacheDir(t *testing.T) {
 		t.Fatalf("cache dir stat error = %v", err)
 	}
 }
+
+func TestAnalyzeInvalidFileReturnsExitError2(t *testing.T) {
+	t.Parallel()
+
+	cmd := newRootCmd()
+	cmd.SetOut(os.Stdout)
+	cmd.SetErr(os.Stderr)
+	cmd.SetArgs([]string{"analyze", "/nonexistent/path/foo.go"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("Execute() error = nil, want exit error")
+	}
+
+	var exitErr *config.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("Execute() error = %T(%v), want *config.ExitError", err, err)
+	}
+	if exitErr.Code != 2 {
+		t.Fatalf("exit code = %d, want 2", exitErr.Code)
+	}
+}
+
+func TestAnalyzeInModuleWithFile(t *testing.T) {
+	moduleRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(moduleRoot, "go.mod"), []byte("module example.com/test\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srcFile := filepath.Join(moduleRoot, "main.go")
+	if err := os.WriteFile(srcFile, []byte("package main\n\nfunc main() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := newRootCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(os.Stderr)
+	cmd.SetArgs([]string{"analyze", "--format", "text", srcFile})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	output := out.String()
+	if !strings.Contains(output, "Source:") {
+		t.Fatalf("output missing 'Source:' header, got: %q", output)
+	}
+}
+
+func TestAnalyzeDirectoryReturnsExitError2(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+
+	cmd := newRootCmd()
+	cmd.SetOut(os.Stdout)
+	cmd.SetErr(os.Stderr)
+	cmd.SetArgs([]string{"analyze", dir})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("Execute() error = nil, want exit error")
+	}
+
+	var exitErr *config.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("Execute() error = %T(%v), want *config.ExitError", err, err)
+	}
+	if exitErr.Code != 2 {
+		t.Fatalf("exit code = %d, want 2", exitErr.Code)
+	}
+}
