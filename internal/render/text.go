@@ -110,10 +110,19 @@ type mermaidRenderer struct {
 }
 
 func (r *mermaidRenderer) Render(ctx context.Context, out Output) error {
-	if _, err := fmt.Fprintln(r.out, "flowchart TD"); err != nil {
+	if _, err := fmt.Fprintln(r.out, "graph TD"); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(r.out, "    source[%s]\n", mermaidNode(out.Source.Path)); err != nil {
+
+	// Source node with risk info.
+	srcNode := mermaidID(out.Source.Path)
+	srcLabel := mermaidLabel(out.Source.Path, out.Source.RiskBand, out.Source.RiskScore)
+	if _, err := fmt.Fprintf(r.out, "    %s[%q]\n", srcNode, srcLabel); err != nil {
+		return err
+	}
+
+	// Style source node.
+	if _, err := fmt.Fprintf(r.out, "    class %s source;\n", srcNode); err != nil {
 		return err
 	}
 
@@ -125,19 +134,72 @@ func (r *mermaidRenderer) Render(ctx context.Context, out Output) error {
 		}
 
 		nodeID := fmt.Sprintf("n%d", i)
-		if _, err := fmt.Fprintf(r.out, "    %s[%s]\n", nodeID, mermaidNode(f.Path)); err != nil {
+		label := mermaidLabel(f.Path, f.RiskBand, f.RiskScore)
+		if _, err := fmt.Fprintf(r.out, "    %s[%q]\n", nodeID, label); err != nil {
 			return err
 		}
-		if _, err := fmt.Fprintf(r.out, "    source --> %s\n", nodeID); err != nil {
-			return err
+
+		// Edge from source (direct) or from parent (indirect).
+		if f.ImpactLevel == "direct" || f.Depth == 1 {
+			if _, err := fmt.Fprintf(r.out, "    %s --> %s\n", srcNode, nodeID); err != nil {
+				return err
+			}
+		} else {
+			// For indirect files, chain through the previous node.
+			parentIdx := i - 1
+			if parentIdx >= 0 {
+				parentID := fmt.Sprintf("n%d", parentIdx)
+				if _, err := fmt.Fprintf(r.out, "    %s -.-> %s\n", parentID, nodeID); err != nil {
+					return err
+				}
+			}
 		}
+
+		// Style by risk band.
+		switch f.RiskBand {
+		case "high":
+			if _, err := fmt.Fprintf(r.out, "    class %s riskHigh;\n", nodeID); err != nil {
+				return err
+			}
+		case "medium":
+			if _, err := fmt.Fprintf(r.out, "    class %s riskMedium;\n", nodeID); err != nil {
+				return err
+			}
+		case "low":
+			if _, err := fmt.Fprintf(r.out, "    class %s riskLow;\n", nodeID); err != nil {
+				return err
+			}
+		}
+	}
+
+	// ClassDef for styling.
+	if _, err := fmt.Fprintln(r.out, "    classDef source fill:#4a90d9,stroke:#333,color:#fff"); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(r.out, "    classDef riskHigh fill:#e74c3c,stroke:#333,color:#fff"); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(r.out, "    classDef riskMedium fill:#f39c12,stroke:#333,color:#fff"); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(r.out, "    classDef riskLow fill:#27ae60,stroke:#333,color:#fff"); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func mermaidNode(path string) string {
-	return strings.ReplaceAll(path, ".", "_")
+// mermaidID converts a file path to a valid Mermaid node ID.
+func mermaidID(path string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(path, "/", "_"), ".", "_")
+}
+
+// mermaidLabel formats a node label with path and risk info.
+func mermaidLabel(path, riskBand string, riskScore int) string {
+	if riskBand != "" {
+		return fmt.Sprintf("%s\\nrisk:%d (%s)", path, riskScore, riskBand)
+	}
+	return path
 }
 
 // tuiRenderer runs an interactive Bubble Tea TUI for browsing affected files.
