@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -10,7 +12,7 @@ func newTestCmd() *cobra.Command {
 		Short: "Run affected tests for a file",
 		Args:  cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			printNotImplemented(cmd)
+			_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "not implemented")
 		},
 	}
 }
