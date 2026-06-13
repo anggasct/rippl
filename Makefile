@@ -38,7 +38,7 @@ $(GOLANGCI):
 
 install-tools:
 	@mkdir -p $(GOBIN)
-	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.1
 
 setup-hooks:
 	git config core.hooksPath .githooks
