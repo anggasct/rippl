@@ -24,8 +24,8 @@ type FileEntry struct {
 
 // TUIOutput is the data contract for the TUI renderer.
 type TUIOutput struct {
-	Title  string
-	Files  []FileEntry
+	Title string
+	Files []FileEntry
 }
 
 // Model is the Bubble Tea model for the interactive TUI.
@@ -43,8 +43,8 @@ type Model struct {
 // NewModel creates a new TUI model from the given output.
 func NewModel(out TUIOutput, noColor bool) Model {
 	return Model{
-		files:    out.Files,
-		cursor:   0,
+		files:   out.Files,
+		cursor:  0,
 		noColor: noColor,
 	}
 }
@@ -261,7 +261,9 @@ func (m Model) renderGroup(title string, files []FileEntry, color string) string
 	return b.String()
 }
 
-// globalIndex finds the index of a file in the original m.files slice.
+// globalIndex returns the index of target in m.files.
+// Note: uses path comparison; duplicate paths are impossible by construction
+// since the engine produces unique file paths per analysis run.
 func (m Model) globalIndex(target FileEntry) int {
 	for i, f := range m.files {
 		if f.Path == target.Path {
@@ -363,6 +365,9 @@ func truncate(s string, maxLen int) string {
 
 // Run starts the interactive TUI with the given output.
 // It blocks until the user quits.
+// Note: tea.WithAltScreen() may leave the terminal in alt-screen mode if the
+// process is killed (e.g. SIGKILL). This is a known Bubble Tea caveat —
+// graceful quit (q / ctrl+c) restores the terminal normally.
 func Run(ctx context.Context, out TUIOutput, noColor bool) error {
 	p := tea.NewProgram(
 		NewModel(out, noColor),
