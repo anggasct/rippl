@@ -139,7 +139,8 @@ func buildOutput(cfg *config.Config, moduleRoot string, result *graph.ImpactResu
 }
 
 func renderOutput(cmd *cobra.Command, cfg *config.Config, out render.Output) error {
-	r, err := render.NewRendererWithWriter(cfg.Output.Format, cmd.OutOrStdout())
+	noColor := cfg.Output.Color == "false"
+	r, err := render.NewRendererWithWriterAndColor(cfg.Output.Format, cmd.OutOrStdout(), noColor)
 	if err != nil {
 		return err
 	}
