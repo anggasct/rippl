@@ -16,6 +16,9 @@ const (
 	signalAuthorCount  = "author_count"
 	signalStaleAge     = "stale_age"
 	signalTestCoverage = "test_coverage"
+
+	// authorCountStep scales authors 2–5 linearly to 20–80 (PRD §8.4: >5 authors = high risk).
+	authorCountStep = 20
 )
 
 func clamp100(v int) int {
@@ -72,7 +75,7 @@ func authorCountNormalized(n int) int {
 	case n >= 6:
 		return 100
 	default:
-		return clamp100(20 * (n - 1))
+		return clamp100(authorCountStep * (n - 1))
 	}
 }
 

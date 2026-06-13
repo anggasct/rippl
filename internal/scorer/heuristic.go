@@ -11,6 +11,8 @@ import (
 )
 
 type HeuristicScorer struct {
+	// now is captured once at construction; ScoreFiles reuses it for all files in a batch.
+	// Tests can inject a fixed time via a package-local constructor if needed later.
 	now time.Time
 }
 
