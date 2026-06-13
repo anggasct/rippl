@@ -39,23 +39,11 @@ func (d discardRenderer) Render(ctx context.Context, out Output) error {
 	return nil
 }
 
-func TestRendererInterfaceSatisfied(t *testing.T) {
-	t.Parallel()
-
-	var r Renderer
-	r = &fakeRenderer{}
-	if r == nil {
-		t.Fatal("fakeRenderer does not satisfy Renderer interface")
-	}
-	r = &errRenderer{}
-	if r == nil {
-		t.Fatal("errRenderer does not satisfy Renderer interface")
-	}
-	r = discardRenderer{}
-	if r == nil {
-		t.Fatal("discardRenderer does not satisfy Renderer interface")
-	}
-}
+var (
+	_ Renderer = (*fakeRenderer)(nil)
+	_ Renderer = (*errRenderer)(nil)
+	_ Renderer = discardRenderer{}
+)
 
 func TestFakeRendererRender(t *testing.T) {
 	t.Parallel()
