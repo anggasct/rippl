@@ -15,10 +15,11 @@ const (
 // Output is the shared output contract for all renderers.
 // It represents the result of an analysis command in a format-agnostic way.
 type Output struct {
-	Version   string    `json:"version"`
-	Command   string    `json:"command"`
-	Module    string    `json:"module"`
-	Generated time.Time `json:"generated_at"`
+	Version    string    `json:"version"`
+	Command    string    `json:"command"`
+	SourceFile string    `json:"source_file"`
+	Module     string    `json:"module"`
+	Generated  time.Time `json:"generated_at"`
 
 	Source  SourceOutput  `json:"source"`
 	Summary SummaryOutput `json:"summary"`
