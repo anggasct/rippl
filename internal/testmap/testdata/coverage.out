@@ -1,0 +1,4 @@
+mode: set
+example.com/minimodule/pkg/beta/beta.go:7.1,9.2 2 1
+example.com/minimodule/pkg/beta/beta.go:12.1,14.1 1 0
+example.com/minimodule/pkg/beta/helper.go:3.1,5.1 1 1

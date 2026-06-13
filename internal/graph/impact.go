@@ -18,13 +18,12 @@ const (
 )
 
 type AffectedFile struct {
-	Path      string
-	Depth     int
-	Level     ImpactLevel
-	Chain     []string
-	Reason    parser.EdgeType
-	RiskScore int
-	// TODO(cap-905): populate HasTestFile via test mapper.
+	Path        string
+	Depth       int
+	Level       ImpactLevel
+	Chain       []string
+	Reason      parser.EdgeType
+	RiskScore   int
 	HasTestFile bool
 }
 
@@ -146,6 +145,21 @@ func ApplyRiskScores(result *ImpactResult, scores map[string]int) {
 		}
 	}
 	sortAffected(result.Affected)
+}
+
+// ApplyTestInfo sets HasTestFile on the source and affected files.
+func ApplyTestInfo(result *ImpactResult, hasTest map[string]bool) {
+	if result == nil {
+		return
+	}
+	if v, ok := hasTest[result.Source.Path]; ok {
+		result.Source.HasTestFile = v
+	}
+	for i := range result.Affected {
+		if v, ok := hasTest[result.Affected[i].Path]; ok {
+			result.Affected[i].HasTestFile = v
+		}
+	}
 }
 
 func impactLevel(depth int) ImpactLevel {

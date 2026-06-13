@@ -23,6 +23,7 @@ func TestLoadModuleFiles(t *testing.T) {
 		"pkg/beta/beta.go",
 		"pkg/beta/beta_test.go",
 		"pkg/beta/helper.go",
+		"pkg/gamma/beta_import_test.go",
 		"pkg/gamma/gamma.go",
 	}
 	if len(paths) != len(want) {

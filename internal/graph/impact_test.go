@@ -207,6 +207,21 @@ func TestAnalyzeImpactReasonUsesParserEdgeType(t *testing.T) {
 	}
 }
 
+func TestApplyTestInfo(t *testing.T) {
+	t.Parallel()
+	result := &ImpactResult{
+		Source:   AffectedFile{Path: "a.go"},
+		Affected: []AffectedFile{{Path: "b.go"}},
+	}
+	ApplyTestInfo(result, map[string]bool{"a.go": true, "b.go": false})
+	if !result.Source.HasTestFile {
+		t.Fatal("expected source HasTestFile true")
+	}
+	if result.Affected[0].HasTestFile {
+		t.Fatal("expected affected HasTestFile false")
+	}
+}
+
 func TestApplyRiskScoresSortsByRiskDescending(t *testing.T) {
 	t.Parallel()
 
