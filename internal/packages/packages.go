@@ -74,6 +74,23 @@ func HasTests(g *graph.Graph, pkgDir string) bool {
 	return false
 }
 
+// SkippedDirs returns sorted package directories in all that are not in tested.
+func SkippedDirs(all, tested []string) []string {
+	testedSet := make(map[string]struct{}, len(tested))
+	for _, dir := range tested {
+		testedSet[dir] = struct{}{}
+	}
+
+	skipped := make([]string, 0)
+	for _, dir := range all {
+		if _, ok := testedSet[dir]; !ok {
+			skipped = append(skipped, dir)
+		}
+	}
+	sort.Strings(skipped)
+	return skipped
+}
+
 // AffectedWithTests returns tested package directories for an impact result.
 func AffectedWithTests(g *graph.Graph, result *graph.ImpactResult) ([]string, int) {
 	return WithTests(g, UniqueDirs(result))

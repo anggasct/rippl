@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/anggasct/rippl/internal/render"
 	"github.com/anggasct/rippl/internal/scorer"
 	"github.com/spf13/cobra"
 )
@@ -22,7 +25,7 @@ func printScoreBreakdown(cmd *cobra.Command, filePath string, result scorer.File
 	}
 
 	for _, s := range result.Signals {
-		if _, err := fmt.Fprintf(out, "\n%s\n", signalDisplayName(s.Name)); err != nil {
+		if _, err := fmt.Fprintf(out, "\n%s\n", render.SignalLabel(s.Name)); err != nil {
 			return err
 		}
 		if _, err := fmt.Fprintf(out, "  Raw:          %s\n", s.Raw); err != nil {
@@ -49,6 +52,13 @@ func printScoreBreakdown(cmd *cobra.Command, filePath string, result scorer.File
 	return nil
 }
 
+func printScoreJSON(cmd *cobra.Command, modulePath, filePath string, result scorer.FileRisk) error {
+	out := render.BuildScoreOutput(modulePath, filePath, result, time.Now().UTC())
+	enc := json.NewEncoder(cmd.OutOrStdout())
+	enc.SetIndent("", "  ")
+	return enc.Encode(out)
+}
+
 func bandLabel(b scorer.RiskBand) string {
 	switch b {
 	case scorer.BandHigh:
@@ -61,24 +71,5 @@ func bandLabel(b scorer.RiskBand) string {
 		return "minimal"
 	default:
 		return string(b)
-	}
-}
-
-func signalDisplayName(name string) string {
-	switch name {
-	case "bug_fix_ratio":
-		return "Bug-Fix Ratio"
-	case "fan_out":
-		return "Fan-Out"
-	case "churn_rate":
-		return "Churn Rate"
-	case "author_count":
-		return "Author Count"
-	case "stale_age":
-		return "Stale Age"
-	case "test_coverage":
-		return "Coverage risk"
-	default:
-		return name
 	}
 }

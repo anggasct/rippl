@@ -171,6 +171,45 @@ func TestAnalyzeInModuleWithFile(t *testing.T) {
 	}
 }
 
+func TestScoreJSONModulePath(t *testing.T) {
+	moduleRoot := minimoduleRoot(t)
+	srcFile := filepath.Join(moduleRoot, "pkg", "alpha", "alpha.go")
+
+	cmd := newRootCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(os.Stderr)
+	cmd.SetArgs([]string{"score", "--format", "json", "--no-cache", srcFile})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	var doc struct {
+		Module  string            `json:"module"`
+		Signals []json.RawMessage `json:"signals"`
+		Command string            `json:"command"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &doc); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, raw: %q", err, out.String())
+	}
+	if doc.Module != "example.com/minimodule" {
+		t.Fatalf("module = %q, want %q", doc.Module, "example.com/minimodule")
+	}
+	if strings.HasPrefix(doc.Module, "/") {
+		t.Fatalf("module = %q, want go.mod path not filesystem path", doc.Module)
+	}
+	if doc.Command != "score" {
+		t.Fatalf("command = %q, want score", doc.Command)
+	}
+	if len(doc.Signals) != 6 {
+		t.Fatalf("signals length = %d, want 6", len(doc.Signals))
+	}
+	if strings.Contains(out.String(), "\x1b[") {
+		t.Fatalf("output contains ANSI escape sequences")
+	}
+}
+
 func TestAnalyzeJSONModulePath(t *testing.T) {
 	moduleRoot := t.TempDir()
 	if err := os.WriteFile(filepath.Join(moduleRoot, "go.mod"), []byte("module example.com/test\n"), 0o644); err != nil {

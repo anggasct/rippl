@@ -40,6 +40,8 @@ func newRootCmd() *cobra.Command {
 			return prepareRuntime(cmd, args, flags)
 		},
 	}
+	rootCmd.SilenceUsage = true
+	rootCmd.SilenceErrors = true
 
 	rootCmd.PersistentFlags().StringVar(&flags.format, "format", defaultFormat(), "Output format: tui, json, mermaid, text")
 	rootCmd.PersistentFlags().IntVar(&flags.maxDepth, "max-depth", 3, "Impact traversal depth")
