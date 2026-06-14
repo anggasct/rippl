@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"path/filepath"
 
-	"github.com/anggasct/rippl/internal/config"
 	"github.com/anggasct/rippl/internal/graph"
 	"github.com/anggasct/rippl/internal/scorer"
 	"github.com/anggasct/rippl/internal/testmap"
@@ -31,9 +29,9 @@ func newScoreCmd() *cobra.Command {
 				return err
 			}
 
-			relPath, err := filepath.Rel(moduleRoot, fileArg)
+			relPath, err := resolveRelativeFilePath(moduleRoot, fileArg)
 			if err != nil {
-				return &config.ExitError{Code: 2, Err: fmt.Errorf("resolve relative path: %w", err)}
+				return err
 			}
 
 			g, err := graph.LoadOrBuild(cmd.Context(), moduleRoot, cfg, noCache)

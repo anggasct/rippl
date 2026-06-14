@@ -34,9 +34,9 @@ func newTestCmd() *cobra.Command {
 				return err
 			}
 
-			relPath, err := filepath.Rel(moduleRoot, fileArg)
+			relPath, err := resolveRelativeFilePath(moduleRoot, fileArg)
 			if err != nil {
-				return &config.ExitError{Code: 2, Err: fmt.Errorf("resolve relative path: %w", err)}
+				return err
 			}
 
 			g, err := graph.LoadOrBuild(cmd.Context(), moduleRoot, cfg, noCache)

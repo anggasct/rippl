@@ -11,7 +11,8 @@ import (
 	"time"
 )
 
-const commitRecordSep = "\x00COMMIT\x00"
+// commitRecordSep must not contain NUL bytes — Linux execve rejects argv with embedded NUL.
+const commitRecordSep = "<<COMMIT>>"
 
 // gitSince normalizes cfg.Risk.Since for git's --since flag.
 // Values without a trailing " ago" get one appended (e.g. "12 months" → "12 months ago").
