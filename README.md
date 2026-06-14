@@ -91,11 +91,33 @@ Commands: `analyze` | `score` | `test` | `graph`
 
 ## Releasing
 
-Rippl ships as a Go module — no separate release binaries.
+Rippl ships as a Go module — no separate release binaries. Version tags are created automatically by [release-please](https://github.com/googleapis/release-please) via [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
-1. Tag a semver release: `git tag v0.1.0 && git push origin v0.1.0`
-2. Install a pinned version: `go install github.com/anggasct/rippl/cmd/rippl@v0.1.0`
-3. Install latest: `go install github.com/anggasct/rippl/cmd/rippl@latest`
+### Maintainer flow
+
+1. Merge feature/fix PRs to `main` using [Conventional Commits](https://www.conventionalcommits.org/) (`feat(cap-xxx):`, `fix(cap-xxx):`, etc.).
+2. CI (`make check`) must pass on each PR.
+3. After pushes to `main`, release-please opens or updates a **Release PR** (changelog + version bump).
+4. Review and merge the Release PR → GitHub tag `vX.Y.Z` and GitHub Release are created.
+5. Users install:
+
+```bash
+go install github.com/anggasct/rippl/cmd/rippl@latest
+go install github.com/anggasct/rippl/cmd/rippl@v0.1.0
+```
+
+### Semver mapping
+
+| Commit type | Version bump |
+|-------------|--------------|
+| `fix(...):` | patch |
+| `feat(...):` | minor |
+| `feat(...)!:` or `BREAKING CHANGE:` | major |
+| `chore`, `docs`, `test` | no bump |
+
+### First release bootstrap
+
+The initial manifest version is `0.1.0` (see [`.release-please-manifest.json`](.release-please-manifest.json)). After the CAP-910 launch PR merges to `main`, the first Release PR will propose `v0.1.0` (or the next semver if releasable commits warrant a bump).
 
 `rippl version` prints `dev` when built from source without release ldflags.
 
