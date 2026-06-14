@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
-	"sort"
-	"strings"
 
 	"github.com/anggasct/rippl/internal/config"
 	"github.com/anggasct/rippl/internal/graph"
+	"github.com/anggasct/rippl/internal/packages"
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +48,7 @@ func newTestCmd() *cobra.Command {
 				return &config.ExitError{Code: 2, Err: err}
 			}
 
-			packages, skipped := resolveAffectedPackages(g, result)
+			packages, skipped := packages.AffectedWithTests(g, result)
 
 			if len(packages) == 0 {
 				_, err := fmt.Fprintln(cmd.OutOrStdout(), "no affected packages with tests")
@@ -63,46 +62,6 @@ func newTestCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "Force cold graph build")
 
 	return cmd
-}
-
-// resolveAffectedPackages computes the unique set of Go package directories
-// that contain both affected files and _test.go files. It returns a sorted
-// slice of package directory paths and the count of affected packages skipped
-// due to having no test files.
-func resolveAffectedPackages(g *graph.Graph, result *graph.ImpactResult) ([]string, int) {
-	pkgSet := make(map[string]bool)
-
-	// Source file's package
-	pkgSet[filepath.Dir(result.Source.Path)] = true
-
-	// All affected files' packages
-	for _, f := range result.Affected {
-		pkgSet[filepath.Dir(f.Path)] = true
-	}
-
-	tested := make([]string, 0, len(pkgSet))
-	skipped := 0
-
-	for pkgDir := range pkgSet {
-		if pkgHasTests(g, pkgDir) {
-			tested = append(tested, pkgDir)
-		} else {
-			skipped++
-		}
-	}
-
-	sort.Strings(tested)
-	return tested, skipped
-}
-
-// pkgHasTests reports whether the graph contains any _test.go file under pkgDir.
-func pkgHasTests(g *graph.Graph, pkgDir string) bool {
-	for _, f := range g.Files() {
-		if filepath.Dir(f) == pkgDir && strings.HasSuffix(f, "_test.go") {
-			return true
-		}
-	}
-	return false
 }
 
 // runTests executes `go test ./<pkgDir/...>` for each package. It prints

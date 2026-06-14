@@ -10,6 +10,7 @@ import (
 
 	"github.com/anggasct/rippl/internal/config"
 	"github.com/anggasct/rippl/internal/graph"
+	"github.com/anggasct/rippl/internal/packages"
 )
 
 func TestTestCmdMissingFileArg(t *testing.T) {
@@ -159,7 +160,7 @@ func TestResolveAffectedPackagesEmptyGraph(t *testing.T) {
 		Affected: []graph.AffectedFile{},
 	}
 
-	pkgs, skipped := resolveAffectedPackages(g, result)
+	pkgs, skipped := packages.AffectedWithTests(g, result)
 	if len(pkgs) != 0 {
 		t.Fatalf("packages = %v, want empty", pkgs)
 	}

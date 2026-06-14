@@ -20,7 +20,7 @@ func EnsureCacheDir(moduleRoot, cacheDir string) error {
 	if err := os.WriteFile(testFile, []byte("ok"), 0o644); err != nil {
 		return fmt.Errorf("cache dir %q is not writable: %w", path, err)
 	}
-	if err := os.Remove(testFile); err != nil {
+	if err := os.Remove(testFile); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("cleanup cache dir test file: %w", err)
 	}
 

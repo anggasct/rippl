@@ -264,3 +264,123 @@ func TestAnalyzeDirectoryReturnsExitError2(t *testing.T) {
 		t.Fatalf("exit code = %d, want 2", exitErr.Code)
 	}
 }
+
+func TestAnalyzeJSONSuggestedActions(t *testing.T) {
+	t.Parallel()
+
+	moduleRoot := minimoduleRoot(t)
+	srcFile := filepath.Join(moduleRoot, "pkg", "gamma", "gamma.go")
+
+	cmd := newRootCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(os.Stderr)
+	cmd.SetArgs([]string{"analyze", "--format", "json", "--no-cache", srcFile})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	var doc struct {
+		Version          string `json:"version"`
+		SuggestedActions struct {
+			PackagesToTest   []string `json:"packages_to_test"`
+			Commands         []string `json:"commands"`
+			UntestedHighRisk []struct {
+				Path string `json:"path"`
+			} `json:"untested_high_risk"`
+		} `json:"suggested_actions"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &doc); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if doc.Version != "1.1" {
+		t.Fatalf("version = %q, want 1.1", doc.Version)
+	}
+	if len(doc.SuggestedActions.PackagesToTest) == 0 {
+		t.Fatal("suggested_actions.packages_to_test is empty")
+	}
+	if len(doc.SuggestedActions.Commands) < 2 {
+		t.Fatalf("commands = %v, want at least 2 entries", doc.SuggestedActions.Commands)
+	}
+	if !strings.HasPrefix(doc.SuggestedActions.Commands[0], "go test ") {
+		t.Fatalf("commands[0] = %q, want go test prefix", doc.SuggestedActions.Commands[0])
+	}
+}
+
+func TestAnalyzeFilterTop(t *testing.T) {
+	t.Parallel()
+
+	moduleRoot := minimoduleRoot(t)
+	srcFile := filepath.Join(moduleRoot, "pkg", "gamma", "gamma.go")
+
+	cmd := newRootCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(os.Stderr)
+	cmd.SetArgs([]string{"analyze", "--format", "json", "--top", "1", "--no-cache", srcFile})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	var doc struct {
+		Affected []json.RawMessage `json:"affected"`
+		Summary  struct {
+			TotalAffectedCount int `json:"total_affected_count"`
+		} `json:"summary"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &doc); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if len(doc.Affected) != 1 {
+		t.Fatalf("affected len = %d, want 1", len(doc.Affected))
+	}
+	if doc.Summary.TotalAffectedCount < 2 {
+		t.Fatalf("total_affected_count = %d, want > 1", doc.Summary.TotalAffectedCount)
+	}
+}
+
+func TestAnalyzeFilterMinRisk(t *testing.T) {
+	t.Parallel()
+
+	moduleRoot := minimoduleRoot(t)
+	srcFile := filepath.Join(moduleRoot, "pkg", "gamma", "gamma.go")
+
+	cmd := newRootCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(os.Stderr)
+	cmd.SetArgs([]string{"analyze", "--format", "json", "--min-risk", "100", "--no-cache", srcFile})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	var doc struct {
+		Affected []json.RawMessage `json:"affected"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &doc); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if len(doc.Affected) != 0 {
+		t.Fatalf("affected len = %d, want 0 for min-risk 100", len(doc.Affected))
+	}
+}
+
+func minimoduleRoot(t *testing.T) string {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for dir := wd; ; dir = filepath.Dir(dir) {
+		candidate := filepath.Join(dir, "internal", "parser", "testdata", "minimodule", "go.mod")
+		if _, err := os.Stat(candidate); err == nil {
+			return filepath.Dir(candidate)
+		}
+		if filepath.Dir(dir) == dir {
+			t.Fatal("minimodule testdata not found")
+		}
+	}
+}

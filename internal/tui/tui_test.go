@@ -200,6 +200,18 @@ func TestListViewShowsCursorOnSelectedFile(t *testing.T) {
 	}
 }
 
+func TestListViewShowsFilterNote(t *testing.T) {
+	m := NewModel(TUIOutput{
+		Files:      []FileEntry{{Path: "a.go", RiskScore: 50}},
+		FilterNote: "Showing 1 of 10 affected files (--top 1)",
+	}, true)
+	m.height = 20
+	view := m.listView()
+	if !strings.Contains(view, "Showing 1 of 10 affected files") {
+		t.Fatalf("list view missing filter note:\n%s", view)
+	}
+}
+
 func fixture48() TUIOutput {
 	files := make([]FileEntry, 48)
 	for i := range files {
