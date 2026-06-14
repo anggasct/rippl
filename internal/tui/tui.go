@@ -44,14 +44,15 @@ type listRow struct {
 
 // Model is the Bubble Tea model for the interactive TUI.
 type Model struct {
-	files        []FileEntry
-	cursor       int
-	showDetail   bool
-	scrollOffset int
-	quitting     bool
-	noColor      bool
-	width        int
-	height       int
+	files              []FileEntry
+	cursor             int
+	showDetail         bool
+	scrollOffset       int
+	detailScrollOffset int
+	quitting           bool
+	noColor            bool
+	width              int
+	height             int
 }
 
 // NewModel creates a new TUI model from the given output.
@@ -65,7 +66,7 @@ func NewModel(out TUIOutput, noColor bool) Model {
 
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd {
-	return nil
+	return tea.WindowSize()
 }
 
 // Update implements tea.Model.
@@ -83,15 +84,45 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "down", "j":
 			m.moveCursor(1)
 
+		case "pgup", "ctrl+u":
+			m.scrollViewport(-m.pageScroll())
+
+		case "pgdown", "ctrl+d":
+			m.scrollViewport(m.pageScroll())
+
+		case "home", "g":
+			if m.showDetail {
+				m.detailScrollOffset = 0
+			} else {
+				m.scrollOffset = 0
+			}
+
+		case "end", "G":
+			if m.showDetail {
+				m.detailScrollOffset = m.maxDetailScroll()
+			} else {
+				m.scrollOffset = m.maxListScroll()
+			}
+
 		case "d":
 			if len(m.files) > 0 {
 				m.showDetail = !m.showDetail
+				m.detailScrollOffset = 0
 			}
 
 		case "esc":
 			if m.showDetail {
 				m.showDetail = false
+				m.detailScrollOffset = 0
 			}
+		}
+
+	case tea.MouseMsg:
+		if msg.Button == tea.MouseButtonWheelUp {
+			m.scrollViewport(-3)
+		}
+		if msg.Button == tea.MouseButtonWheelDown {
+			m.scrollViewport(3)
 		}
 
 	case tea.WindowSizeMsg:
@@ -112,7 +143,77 @@ func (m *Model) moveCursor(delta int) {
 		return
 	}
 	m.cursor = next
-	m.ensureCursorVisible()
+	if m.showDetail {
+		m.detailScrollOffset = 0
+	} else {
+		m.ensureCursorVisible()
+	}
+}
+
+func (m *Model) pageScroll() int {
+	vis := m.visibleLines()
+	if vis < 1 {
+		return 1
+	}
+	return vis
+}
+
+func (m *Model) maxListScroll() int {
+	rows := m.buildListRows()
+	vis := m.visibleLines()
+	maxOffset := len(rows) - vis
+	if maxOffset < 0 {
+		return 0
+	}
+	return maxOffset
+}
+
+func (m *Model) scrollViewport(delta int) {
+	if m.showDetail {
+		m.detailScrollOffset += delta
+		max := m.maxDetailScroll()
+		if m.detailScrollOffset > max {
+			m.detailScrollOffset = max
+		}
+		if m.detailScrollOffset < 0 {
+			m.detailScrollOffset = 0
+		}
+		return
+	}
+
+	m.scrollOffset += delta
+	max := m.maxListScroll()
+	if m.scrollOffset > max {
+		m.scrollOffset = max
+	}
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
+}
+
+func (m *Model) maxDetailScroll() int {
+	lines := m.detailLineCount()
+	vis := m.visibleLines()
+	maxOffset := lines - vis
+	if maxOffset < 0 {
+		return 0
+	}
+	return maxOffset
+}
+
+func (m *Model) detailLineCount() int {
+	if len(m.files) == 0 || m.cursor >= len(m.files) {
+		return 0
+	}
+	f := m.files[m.cursor]
+	lines := 8 // title, rule, blank, impact, risk, band, coverage, test
+	if f.Reason != "" {
+		lines++
+	}
+	if len(f.Chain) > 0 {
+		lines++
+	}
+	return lines
 }
 
 func (m *Model) buildListRows() []listRow {
@@ -246,7 +347,9 @@ func (m Model) listView() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(m.styleFaint().Render("  up/down: navigate  d: detail  q: quit"))
+	footer := fmt.Sprintf("  %d/%d  ↑↓: navigate  PgUp/PgDn: scroll  d: detail  q: quit",
+		m.cursor+1, len(m.files))
+	b.WriteString(m.styleFaint().Render(footer))
 
 	return b.String()
 }
@@ -289,13 +392,37 @@ func (m Model) detailView() string {
 	}
 
 	f := m.files[m.cursor]
+	lines := m.detailContentLines(f)
+	vis := m.visibleLines()
+	scroll := m.detailScrollOffset
+	maxScroll := len(lines) - vis
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	if scroll > maxScroll {
+		scroll = maxScroll
+	}
+
+	end := scroll + vis
+	if end > len(lines) {
+		end = len(lines)
+	}
+
 	var b strings.Builder
+	for i := scroll; i < end; i++ {
+		b.WriteString(lines[i])
+		b.WriteString("\n")
+	}
 
-	b.WriteString(m.styleBold().Render(fmt.Sprintf("Detail: %s", f.Path)))
 	b.WriteString("\n")
-	b.WriteString(strings.Repeat("-", 50))
-	b.WriteString("\n\n")
+	footer := fmt.Sprintf("  %d/%d  ↑↓: prev/next  PgUp/PgDn: scroll  d/esc: close  q: quit",
+		m.cursor+1, len(m.files))
+	b.WriteString(m.styleFaint().Render(footer))
 
+	return b.String()
+}
+
+func (m Model) detailContentLines(f FileEntry) []string {
 	band := riskBand(f.RiskScore)
 	bandColor := riskColor(band, m.noColor)
 	bandStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(bandColor))
@@ -303,27 +430,29 @@ func (m Model) detailView() string {
 		bandStyle = lipgloss.NewStyle()
 	}
 
-	fmt.Fprintf(&b, "  Impact:    %s (depth %d)\n", f.ImpactLevel, f.Depth)
-	fmt.Fprintf(&b, "  Risk:      %d/100\n", f.RiskScore)
-	fmt.Fprintf(&b, "  Band:      %s\n", bandStyle.Render(band))
-	fmt.Fprintf(&b, "  Coverage:  %.1f%%\n", f.Coverage)
-	fmt.Fprintf(&b, "  Test file: %s\n", yesNo(f.HasTestFile))
-	fmt.Fprintf(&b, "  Reason:    %s\n", f.Reason)
-
-	if len(f.Chain) > 0 {
-		fmt.Fprintf(&b, "  Chain:     %s\n", strings.Join(f.Chain, " -> "))
+	lines := []string{
+		m.styleBold().Render(fmt.Sprintf("Detail: %s", f.Path)),
+		strings.Repeat("-", 50),
+		"",
+		fmt.Sprintf("  Impact:    %s (depth %d)", f.ImpactLevel, f.Depth),
+		fmt.Sprintf("  Risk:      %d/100", f.RiskScore),
+		fmt.Sprintf("  Band:      %s", bandStyle.Render(band)),
+		fmt.Sprintf("  Coverage:  %.1f%%", f.Coverage),
+		fmt.Sprintf("  Test file: %s", yesNo(f.HasTestFile)),
+		fmt.Sprintf("  Reason:    %s", f.Reason),
 	}
-
-	b.WriteString("\n")
-	b.WriteString(m.styleFaint().Render("  up/down: prev/next file  d/esc: close  q: quit"))
-
-	return b.String()
+	if len(f.Chain) > 0 {
+		lines = append(lines, fmt.Sprintf("  Chain:     %s", strings.Join(f.Chain, " -> ")))
+	}
+	return lines
 }
 
-// visibleLines returns how many rows can fit in the viewport.
+// visibleLines returns how many content rows fit below the list header and above the footer.
 func (m Model) visibleLines() int {
-	if m.height > 6 {
-		return m.height - 6
+	// Fixed chrome: title block (2 lines) + footer (2 lines).
+	const chromeLines = 4
+	if m.height > chromeLines+1 {
+		return m.height - chromeLines
 	}
 	return 10
 }
@@ -420,6 +549,7 @@ func Run(ctx context.Context, out TUIOutput, noColor bool) error {
 		NewModel(out, noColor),
 		tea.WithContext(ctx),
 		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(),
 	)
 	_, err := p.Run()
 	return err

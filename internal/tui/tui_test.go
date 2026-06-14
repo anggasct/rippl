@@ -228,12 +228,30 @@ func itoa(i int) string {
 	return string(digits)
 }
 
+func TestModelScrollViewport(t *testing.T) {
+	m := NewModel(fixture48(), false)
+	m.height = 20
+
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyPgDown})
+	m = next.(Model)
+	if m.scrollOffset == 0 {
+		t.Fatalf("scrollOffset = %d after PgDown, want > 0", m.scrollOffset)
+	}
+
+	start := m.scrollOffset
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyPgUp})
+	m = next.(Model)
+	if m.scrollOffset >= start {
+		t.Fatalf("scrollOffset = %d after PgUp, want < %d", m.scrollOffset, start)
+	}
+}
+
 func TestModelVisibleLines(t *testing.T) {
 	t.Parallel()
 	m := NewModel(TUIOutput{}, false)
 	m.height = 20
-	if m.visibleLines() != 14 {
-		t.Errorf("visibleLines() = %d, want 14", m.visibleLines())
+	if m.visibleLines() != 16 {
+		t.Errorf("visibleLines() = %d, want 16", m.visibleLines())
 	}
 	m.height = 3
 	if m.visibleLines() != 10 {
