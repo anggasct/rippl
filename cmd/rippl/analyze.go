@@ -80,7 +80,12 @@ func newAnalyzeCmd() *cobra.Command {
 			}
 			graph.ApplyRiskScores(result, scoreMap)
 
-			out := buildOutput(cfg, moduleRoot, result, riskScores, coverageInfo)
+			modulePath, err := config.ModulePath(moduleRoot)
+			if err != nil {
+				return err
+			}
+
+			out := buildOutput(cfg, modulePath, result, riskScores, coverageInfo)
 			return renderOutput(cmd, cfg, out)
 		},
 	}
@@ -115,7 +120,7 @@ func resolveModuleRoot(fileArg string) (string, error) {
 	return root, nil
 }
 
-func buildOutput(cfg *config.Config, moduleRoot string, result *graph.ImpactResult, riskScores map[string]scorer.FileRisk, coverageInfo map[string]testmap.FileCoverage) render.Output {
+func buildOutput(cfg *config.Config, modulePath string, result *graph.ImpactResult, riskScores map[string]scorer.FileRisk, coverageInfo map[string]testmap.FileCoverage) render.Output {
 	now := time.Now().UTC()
 
 	srcRisk := riskScores[result.Source.Path]
@@ -125,7 +130,7 @@ func buildOutput(cfg *config.Config, moduleRoot string, result *graph.ImpactResu
 		Version:    version,
 		Command:    "analyze",
 		SourceFile: result.Source.Path,
-		Module:     moduleRoot,
+		Module:     modulePath,
 		Generated:  now,
 		Source: render.SourceOutput{
 			Path:      result.Source.Path,

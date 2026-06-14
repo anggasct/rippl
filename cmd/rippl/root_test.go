@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -167,6 +168,40 @@ func TestAnalyzeInModuleWithFile(t *testing.T) {
 	output := out.String()
 	if !strings.Contains(output, "Source:") {
 		t.Fatalf("output missing 'Source:' header, got: %q", output)
+	}
+}
+
+func TestAnalyzeJSONModulePath(t *testing.T) {
+	moduleRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(moduleRoot, "go.mod"), []byte("module example.com/test\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srcFile := filepath.Join(moduleRoot, "main.go")
+	if err := os.WriteFile(srcFile, []byte("package main\n\nfunc main() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := newRootCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(os.Stderr)
+	cmd.SetArgs([]string{"analyze", "--format", "json", srcFile})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	var doc struct {
+		Module string `json:"module"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &doc); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if doc.Module != "example.com/test" {
+		t.Fatalf("module = %q, want %q", doc.Module, "example.com/test")
+	}
+	if strings.HasPrefix(doc.Module, "/") {
+		t.Fatalf("module = %q, want go.mod path not filesystem path", doc.Module)
 	}
 }
 

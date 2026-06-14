@@ -222,6 +222,27 @@ func TestApplyTestInfo(t *testing.T) {
 	}
 }
 
+func TestApplyTestInfoMarksTestFiles(t *testing.T) {
+	t.Parallel()
+	result := &ImpactResult{
+		Source: AffectedFile{Path: "pkg/foo_test.go"},
+		Affected: []AffectedFile{
+			{Path: "pkg/bar_test.go"},
+			{Path: "pkg/baz.go"},
+		},
+	}
+	ApplyTestInfo(result, map[string]bool{"pkg/baz.go": false})
+	if !result.Source.HasTestFile {
+		t.Fatal("expected test source HasTestFile true")
+	}
+	if !result.Affected[0].HasTestFile {
+		t.Fatal("expected affected test file HasTestFile true")
+	}
+	if result.Affected[1].HasTestFile {
+		t.Fatal("expected production file without tests HasTestFile false")
+	}
+}
+
 func TestApplyRiskScoresSortsByRiskDescending(t *testing.T) {
 	t.Parallel()
 

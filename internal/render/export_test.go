@@ -417,3 +417,63 @@ func TestWP02MermaidLabel(t *testing.T) {
 		}
 	}
 }
+
+func makeTextOutput(fileCount int) Output {
+	files := make([]FileOutput, fileCount)
+	for i := range files {
+		files[i] = FileOutput{
+			Path:        fmt.Sprintf("pkg/file%d.go", i),
+			ImpactLevel: "direct",
+			Depth:       1,
+			RiskScore:   50,
+			Chain:       []string{"source.go", fmt.Sprintf("pkg/file%d.go", i)},
+		}
+	}
+	return Output{
+		Source: SourceOutput{Path: "source.go"},
+		Summary: SummaryOutput{
+			AffectedCount: fileCount,
+			DirectCount:   fileCount,
+		},
+		Files: files,
+	}
+}
+
+func TestTextRendererTruncatesLongList(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	r := &textRenderer{out: &buf}
+	if err := r.Render(context.Background(), makeTextOutput(25)); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	out := buf.String()
+	if strings.Count(out, "\n  ") < 20 {
+		t.Fatalf("expected at least 20 file lines, got:\n%s", out)
+	}
+	if !strings.Contains(out, "... and 5 more affected files") {
+		t.Fatalf("output missing truncation footer, got:\n%s", out)
+	}
+	if strings.Contains(out, "file24.go") {
+		t.Fatalf("output should not include file beyond limit, got:\n%s", out)
+	}
+}
+
+func TestTextRendererFullListWhenShort(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	r := &textRenderer{out: &buf}
+	if err := r.Render(context.Background(), makeTextOutput(5)); err != nil {
+		t.Fatalf("Render() error = %v", err)
+	}
+
+	out := buf.String()
+	if strings.Contains(out, "... and") {
+		t.Fatalf("output should not truncate short lists, got:\n%s", out)
+	}
+	if !strings.Contains(out, "file4.go") {
+		t.Fatalf("output missing last file, got:\n%s", out)
+	}
+}

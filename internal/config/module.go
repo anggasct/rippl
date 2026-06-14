@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"golang.org/x/mod/modfile"
 )
 
 func FindModuleRoot(startDir string) (string, error) {
@@ -40,4 +42,21 @@ func FindModuleRootFromPath(path string) (string, error) {
 	}
 
 	return FindModuleRoot(startDir)
+}
+
+// ModulePath returns the module path from go.mod at moduleRoot.
+// If go.mod has no module directive, it returns an empty string.
+func ModulePath(moduleRoot string) (string, error) {
+	data, err := os.ReadFile(filepath.Join(moduleRoot, "go.mod"))
+	if err != nil {
+		return "", fmt.Errorf("read go.mod: %w", err)
+	}
+	mod, err := modfile.Parse("go.mod", data, nil)
+	if err != nil {
+		return "", fmt.Errorf("parse go.mod: %w", err)
+	}
+	if mod.Module == nil {
+		return "", nil
+	}
+	return mod.Module.Mod.Path, nil
 }

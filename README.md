@@ -46,7 +46,65 @@ rippl analyze handler.go --format mermaid
 rippl graph --format json
 ```
 
-Optional config: `.rippl.yaml` at module root. Graph cache is stored under `.rippl/cache/` — add `.rippl/` to your `.gitignore`.
+## Usage
+
+Run `rippl` from the root of a Go module. Commands that take a file argument require a **path to a `.go` file** (not a directory).
+
+| Command | Arguments | Description |
+|---------|-----------|-------------|
+| `rippl analyze` | `<file>` | Blast radius, risk scores, and test status per affected file |
+| `rippl score` | `<file>` | Six-signal risk breakdown for one file |
+| `rippl test` | `<file>` | Run `go test` in packages affected by a change |
+| `rippl graph` | — | Export the full module dependency graph |
+| `rippl version` | — | Print version |
+
+Run `rippl <command> --help` for full flag details.
+
+### Global flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--format` | `tui` on a TTY, `text` when piped | Output format: `tui`, `text`, `json`, `mermaid` |
+| `--max-depth` | `3` | Impact traversal depth (BFS hops) |
+| `--since` | `12 months` | Git history window for risk signals |
+| `--no-cache` | `false` | Force a cold rebuild of the dependency graph |
+| `--config` | `.rippl.yaml` | Config file path (relative to module root) |
+| `--no-color` | auto | Disable ANSI colors |
+
+**Formats by command:**
+
+- `analyze` — all formats (`tui` default on a terminal)
+- `score`, `test` — text output to stdout
+- `graph` — `mermaid` (default), `json`; `text` / `tui` fall back to mermaid
+
+### Command flags
+
+| Command | Flag | Description |
+|---------|------|-------------|
+| `analyze`, `score`, `test`, `graph` | `--no-cache` | Force cold graph build (also available as a global flag) |
+| `graph` | `--package <prefix>` | Limit export to a package subgraph |
+
+### Interactive TUI
+
+When stdout is a terminal, `rippl analyze <file>` opens an interactive UI (override with `--format text` or `--format json` for scripts).
+
+| Key | Action |
+|-----|--------|
+| ↑ / ↓, `j` / `k` | Move selection (works in list and detail views) |
+| PgUp / PgDn, Ctrl+U / Ctrl+D | Scroll the viewport |
+| Mouse wheel | Scroll the list |
+| `d` | Toggle detail panel for the selected file |
+| `Esc` | Close detail panel |
+| `q` | Quit |
+
+The footer shows your position as `N/total` affected files.
+
+### Tips
+
+- **Scripts and CI:** use `--format json` for machine-readable output, or `--format text` for a short summary.
+- **Long text output:** `analyze --format text` shows up to 20 affected files, then `... and N more`; JSON always includes the full list.
+- **Config:** optional `.rippl.yaml` at module root.
+- **Cache:** graph cache lives under `.rippl/cache/` — add `.rippl/` to `.gitignore`.
 
 ## Architecture
 
@@ -54,12 +112,10 @@ Optional config: `.rippl.yaml` at module root. Graph cache is stored under `.rip
 flowchart TD
     shell[Developer shell]
     cli[Cobra CLI]
-    pipeline[Engine pipeline]
-    cacheDir[".rippl/cache/"]
+    cacheDir[".rippl/cache"]
 
     shell --> cli
-    cli --> pipeline
-    pipeline --> cacheDir
+    cli --> parser
 
     subgraph ripplEngine [Engine]
         parser[parser]
@@ -68,14 +124,16 @@ flowchart TD
         scorer[scorer]
         testmap[testmap]
         impact["impact BFS"]
-        render[render]
+        renderer[render]
         parser --> depGraph
         depGraph --> gitLayer
         depGraph --> scorer
         depGraph --> testmap
         depGraph --> impact
-        impact --> render
+        impact --> renderer
     end
+
+    renderer --> cacheDir
 ```
 
 Commands: `analyze` | `score` | `test` | `graph`
