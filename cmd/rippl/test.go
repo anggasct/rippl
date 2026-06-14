@@ -30,6 +30,9 @@ func newTestCmd() *cobra.Command {
 			}
 
 			cfg := configForCmd(cmd)
+			if err := rejectAgentFormat(cfg, "test"); err != nil {
+				return err
+			}
 			moduleRoot, err := resolveModuleRoot(fileArg)
 			if err != nil {
 				return err

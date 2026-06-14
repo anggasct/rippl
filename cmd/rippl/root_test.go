@@ -171,6 +171,33 @@ func TestAnalyzeInModuleWithFile(t *testing.T) {
 	}
 }
 
+func TestAnalyzeAgentFormatOmitsChains(t *testing.T) {
+	moduleRoot := minimoduleRoot(t)
+	srcFile := filepath.Join(moduleRoot, "pkg", "gamma", "gamma.go")
+
+	cmd := newRootCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(os.Stderr)
+	cmd.SetArgs([]string{"analyze", "--format", "agent", "--no-cache", srcFile})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	var doc struct {
+		Affected []map[string]interface{} `json:"affected"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &doc); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	for i, row := range doc.Affected {
+		if _, ok := row["chain"]; ok {
+			t.Fatalf("affected[%d] has chain key, want omitted", i)
+		}
+	}
+}
+
 func TestScoreJSONModulePath(t *testing.T) {
 	moduleRoot := minimoduleRoot(t)
 	srcFile := filepath.Join(moduleRoot, "pkg", "alpha", "alpha.go")

@@ -27,6 +27,9 @@ func newScoreCmd() *cobra.Command {
 			}
 
 			cfg := configForCmd(cmd)
+			if err := rejectAgentFormat(cfg, "score"); err != nil {
+				return err
+			}
 			moduleRoot, err := resolveModuleRoot(fileArg)
 			if err != nil {
 				return err
