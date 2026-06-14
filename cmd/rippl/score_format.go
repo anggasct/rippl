@@ -39,6 +39,10 @@ func printScoreBreakdown(cmd *cobra.Command, filePath string, result scorer.File
 		}
 	}
 
+	if _, err := fmt.Fprintln(out, "Note: lower test coverage increases the Coverage risk contribution."); err != nil {
+		return err
+	}
+
 	if _, err := fmt.Fprintln(out); err != nil {
 		return err
 	}
@@ -73,7 +77,7 @@ func signalDisplayName(name string) string {
 	case "stale_age":
 		return "Stale Age"
 	case "test_coverage":
-		return "Test Coverage"
+		return "Coverage risk"
 	default:
 		return name
 	}
