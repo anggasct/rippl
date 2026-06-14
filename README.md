@@ -112,12 +112,10 @@ The footer shows your position as `N/total` affected files.
 flowchart TD
     shell[Developer shell]
     cli[Cobra CLI]
-    pipeline[Engine pipeline]
-    cacheDir[".rippl/cache/"]
+    cacheDir[".rippl/cache"]
 
     shell --> cli
-    cli --> pipeline
-    pipeline --> cacheDir
+    cli --> parser
 
     subgraph ripplEngine [Engine]
         parser[parser]
@@ -126,14 +124,16 @@ flowchart TD
         scorer[scorer]
         testmap[testmap]
         impact["impact BFS"]
-        render[render]
+        renderer[render]
         parser --> depGraph
         depGraph --> gitLayer
         depGraph --> scorer
         depGraph --> testmap
         depGraph --> impact
-        impact --> render
+        impact --> renderer
     end
+
+    renderer --> cacheDir
 ```
 
 Commands: `analyze` | `score` | `test` | `graph`
