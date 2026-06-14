@@ -152,11 +152,18 @@ func ApplyTestInfo(result *ImpactResult, hasTest map[string]bool) {
 	if result == nil {
 		return
 	}
-	if v, ok := hasTest[result.Source.Path]; ok {
+	if isTestFile(result.Source.Path) {
+		result.Source.HasTestFile = true
+	} else if v, ok := hasTest[result.Source.Path]; ok {
 		result.Source.HasTestFile = v
 	}
 	for i := range result.Affected {
-		if v, ok := hasTest[result.Affected[i].Path]; ok {
+		path := result.Affected[i].Path
+		if isTestFile(path) {
+			result.Affected[i].HasTestFile = true
+			continue
+		}
+		if v, ok := hasTest[path]; ok {
 			result.Affected[i].HasTestFile = v
 		}
 	}
