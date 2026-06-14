@@ -41,20 +41,4 @@ Put internal capability IDs (for example `CAP-203`) in the **PR description** or
 
 ## Releases
 
-Rippl is distributed as a Go module (`go install`). Tags are managed by [release-please](https://github.com/googleapis/release-please) via [`.github/workflows/release.yml`](.github/workflows/release.yml).
-
-After merges to `main`, release-please opens a **Release PR** with changelog and version bumps. Merge that PR to publish `vX.Y.Z`.
-
-### One-time GitHub setting
-
-If the Release workflow fails with *GitHub Actions is not permitted to create or approve pull requests*:
-
-1. **Settings** → **Actions** → **General**
-2. **Workflow permissions** → **Read and write permissions**
-3. Enable **Allow GitHub Actions to create and approve pull requests**
-
-Release PRs must be opened by the release-please bot. Do not create them manually.
-
-### Internal project docs
-
-Maintainers with the Obsidian vault symlink may use `project-docs/` and [AGENTS.md](AGENTS.md) for capability specs and delivery process. That material is not required for general contributors.
+Rippl is distributed as a Go module (`go install`). Version tags and [CHANGELOG.md](CHANGELOG.md) updates are published from `main` via the Release workflow in [`.github/workflows/release.yml`](.github/workflows/release.yml).
