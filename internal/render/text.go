@@ -11,6 +11,8 @@ import (
 	"github.com/anggasct/rippl/internal/tui"
 )
 
+const textAffectedFileLimit = 20
+
 // NewRenderer creates a Renderer for the given format string.
 // Supported formats: text, json, mermaid, tui.
 // Falls back to text for unknown formats.
@@ -68,7 +70,13 @@ func (r *textRenderer) Render(ctx context.Context, out Output) error {
 		return err
 	}
 
-	for i, f := range out.Files {
+	displayCount := len(out.Files)
+	if displayCount > textAffectedFileLimit {
+		displayCount = textAffectedFileLimit
+	}
+
+	for i := 0; i < displayCount; i++ {
+		f := out.Files[i]
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -86,6 +94,13 @@ func (r *textRenderer) Render(ctx context.Context, out Output) error {
 
 		if _, err := fmt.Fprintf(r.out, "  %d. [%s] %s (depth=%d, risk=%d)%s\n",
 			i+1, strings.ToUpper(f.ImpactLevel), chain, f.Depth, f.RiskScore, testStatus); err != nil {
+			return err
+		}
+	}
+
+	if len(out.Files) > textAffectedFileLimit {
+		remaining := len(out.Files) - textAffectedFileLimit
+		if _, err := fmt.Fprintf(r.out, "  ... and %d more affected files\n", remaining); err != nil {
 			return err
 		}
 	}
