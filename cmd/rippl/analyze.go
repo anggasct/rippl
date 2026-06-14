@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/anggasct/rippl/internal/config"
@@ -15,7 +16,11 @@ import (
 )
 
 func newAnalyzeCmd() *cobra.Command {
-	var noCache bool
+	var (
+		noCache bool
+		top     int
+		minRisk int
+	)
 
 	cmd := &cobra.Command{
 		Use:   "analyze <file>",
@@ -85,12 +90,14 @@ func newAnalyzeCmd() *cobra.Command {
 				return err
 			}
 
-			out := buildOutput(cfg, modulePath, result, riskScores, coverageInfo)
+			out := buildOutput(cfg, modulePath, result, riskScores, coverageInfo, top, minRisk)
 			return renderOutput(cmd, cfg, out)
 		},
 	}
 
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "Force cold graph build")
+	cmd.Flags().IntVar(&top, "top", 0, "Max affected entries in output (0 = all)")
+	cmd.Flags().IntVar(&minRisk, "min-risk", 0, "Min risk score 0-100 (0 = off)")
 
 	return cmd
 }
@@ -120,14 +127,21 @@ func resolveModuleRoot(fileArg string) (string, error) {
 	return root, nil
 }
 
-func buildOutput(cfg *config.Config, modulePath string, result *graph.ImpactResult, riskScores map[string]scorer.FileRisk, coverageInfo map[string]testmap.FileCoverage) render.Output {
+func buildOutput(
+	cfg *config.Config,
+	modulePath string,
+	result *graph.ImpactResult,
+	riskScores map[string]scorer.FileRisk,
+	coverageInfo map[string]testmap.FileCoverage,
+	top, minRisk int,
+) render.Output {
 	now := time.Now().UTC()
 
 	srcRisk := riskScores[result.Source.Path]
 	srcCov := coverageInfo[result.Source.Path]
 
 	out := render.Output{
-		Version:    version,
+		Version:    render.OutputSchemaVersion,
 		Command:    "analyze",
 		SourceFile: result.Source.Path,
 		Module:     modulePath,
@@ -139,11 +153,6 @@ func buildOutput(cfg *config.Config, modulePath string, result *graph.ImpactResu
 			Coverage:  coveragePct(srcCov),
 		},
 	}
-
-	directCount := 0
-	indirectCount := 0
-	withoutTests := 0
-	maxRisk := 0
 
 	for _, f := range result.Affected {
 		level := string(f.Level)
@@ -161,29 +170,43 @@ func buildOutput(cfg *config.Config, modulePath string, result *graph.ImpactResu
 			Chain:       f.Chain,
 			Reason:      string(f.Reason),
 		})
-
-		if f.Level == graph.ImpactDirect {
-			directCount++
-		} else {
-			indirectCount++
-		}
-		if !f.HasTestFile {
-			withoutTests++
-		}
-		if f.RiskScore > maxRisk {
-			maxRisk = f.RiskScore
-		}
 	}
 
-	out.Summary = render.SummaryOutput{
-		AffectedCount: len(result.Affected),
-		DirectCount:   directCount,
-		IndirectCount: indirectCount,
-		WithoutTests:  withoutTests,
-		MaxRiskScore:  maxRisk,
+	totalAffected := len(out.Files)
+	if strings.EqualFold(cfg.Output.Format, string(render.FormatJSON)) {
+		out.SuggestedActions = render.BuildSuggestedActions(result, riskScores)
+	}
+
+	if top > 0 || minRisk > 0 {
+		out.Files = render.ApplyAnalyzeFilters(out.Files, top, minRisk)
+		out.Summary = render.RecomputeSummary(out.Files, totalAffected)
+		out.FilterNote = render.BuildFilterNote(len(out.Files), totalAffected, top, minRisk)
+	} else {
+		out.Summary = summarizeFiles(out.Files)
 	}
 
 	return out
+}
+
+func summarizeFiles(files []render.FileOutput) render.SummaryOutput {
+	summary := render.SummaryOutput{
+		AffectedCount: len(files),
+	}
+	for _, f := range files {
+		switch f.ImpactLevel {
+		case string(graph.ImpactDirect):
+			summary.DirectCount++
+		default:
+			summary.IndirectCount++
+		}
+		if !f.HasTestFile {
+			summary.WithoutTests++
+		}
+		if f.RiskScore > summary.MaxRiskScore {
+			summary.MaxRiskScore = f.RiskScore
+		}
+	}
+	return summary
 }
 
 func coveragePct(fc testmap.FileCoverage) float64 {

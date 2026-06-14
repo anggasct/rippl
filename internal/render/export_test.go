@@ -17,7 +17,7 @@ func TestWP01JSONSchemaStability(t *testing.T) {
 	t.Parallel()
 
 	out := Output{
-		Version:   "1",
+		Version:   OutputSchemaVersion,
 		Command:   "analyze",
 		Module:    "github.com/example/app",
 		Generated: time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
@@ -58,6 +58,14 @@ func TestWP01JSONSchemaStability(t *testing.T) {
 				Reason:      "call",
 			},
 		},
+		SuggestedActions: &SuggestedActionsOutput{
+			PackagesToTest: []string{"./handler"},
+			Commands: []string{
+				"go test ./handler/...",
+				"rippl score internal/auth/jwt.go --format json",
+			},
+			UntestedHighRisk: []UntestedHighRiskEntry{},
+		},
 	}
 
 	var buf bytes.Buffer
@@ -75,7 +83,7 @@ func TestWP01JSONSchemaStability(t *testing.T) {
 	}
 
 	// 2. Top-level required fields.
-	requiredTop := []string{"version", "command", "source_file", "module", "generated_at", "summary", "source", "affected"}
+	requiredTop := []string{"version", "command", "source_file", "module", "generated_at", "summary", "source", "affected", "suggested_actions"}
 	for _, key := range requiredTop {
 		if _, ok := doc[key]; !ok {
 			t.Errorf("missing top-level field %q", key)
@@ -115,7 +123,15 @@ func TestWP01JSONSchemaStability(t *testing.T) {
 		}
 	}
 
-	// 6. Risk bands must be valid enum values.
+	// 6. suggested_actions object fields.
+	actions := doc["suggested_actions"].(map[string]interface{})
+	for _, key := range []string{"packages_to_test", "commands", "untested_high_risk"} {
+		if _, ok := actions[key]; !ok {
+			t.Errorf("missing suggested_actions field %q", key)
+		}
+	}
+
+	// 7. Risk bands must be valid enum values.
 	validBands := map[string]bool{"high": true, "medium": true, "low": true, "minimal": true}
 	band, _ := src["risk_band"].(string)
 	if !validBands[band] {
@@ -129,12 +145,12 @@ func TestWP01JSONSchemaStability(t *testing.T) {
 		}
 	}
 
-	// 7. No ANSI escape codes in output.
+	// 8. No ANSI escape codes in output.
 	if strings.Contains(buf.String(), "\x1b[") {
 		t.Error("JSON output contains ANSI escape codes")
 	}
 
-	// 8. Deterministic: re-encode and compare.
+	// 9. Deterministic: re-encode and compare.
 	var buf2 bytes.Buffer
 	r2 := &jsonRenderer{out: &buf2}
 	if err := r2.Render(context.Background(), out); err != nil {
@@ -150,7 +166,7 @@ func TestWP01JSONEmptyAffected(t *testing.T) {
 	t.Parallel()
 
 	out := Output{
-		Version:   "1",
+		Version:   OutputSchemaVersion,
 		Command:   "analyze",
 		Module:    "github.com/example/app",
 		Generated: time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
@@ -194,7 +210,7 @@ func TestWP02MermaidExport(t *testing.T) {
 	t.Parallel()
 
 	out := Output{
-		Version:   "1",
+		Version:   OutputSchemaVersion,
 		Command:   "analyze",
 		Module:    "github.com/example/app",
 		Generated: time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
@@ -342,7 +358,7 @@ func TestWP02MermaidEmptyAffected(t *testing.T) {
 	t.Parallel()
 
 	out := Output{
-		Version:   "1",
+		Version:   OutputSchemaVersion,
 		Command:   "analyze",
 		Module:    "github.com/example/app",
 		Generated: time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),

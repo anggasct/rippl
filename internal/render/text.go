@@ -61,6 +61,11 @@ func (r *textRenderer) Render(ctx context.Context, out Output) error {
 	if _, err := fmt.Fprintf(r.out, "Without tests: %d  Max risk: %d\n", out.Summary.WithoutTests, out.Summary.MaxRiskScore); err != nil {
 		return err
 	}
+	if out.FilterNote != "" {
+		if _, err := fmt.Fprintln(r.out, out.FilterNote); err != nil {
+			return err
+		}
+	}
 
 	if len(out.Files) == 0 {
 		return nil
@@ -225,8 +230,9 @@ type tuiRenderer struct {
 
 func (r *tuiRenderer) Render(ctx context.Context, out Output) error {
 	tuiOut := tui.TUIOutput{
-		Title: fmt.Sprintf("rippl — %s", out.Source.Path),
-		Files: make([]tui.FileEntry, 0, len(out.Files)),
+		Title:      fmt.Sprintf("rippl — %s", out.Source.Path),
+		FilterNote: out.FilterNote,
+		Files:      make([]tui.FileEntry, 0, len(out.Files)),
 	}
 	for _, f := range out.Files {
 		tuiOut.Files = append(tuiOut.Files, tui.FileEntry{

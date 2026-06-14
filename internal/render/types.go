@@ -2,6 +2,9 @@ package render
 
 import "time"
 
+// OutputSchemaVersion is the analyze JSON output schema version.
+const OutputSchemaVersion = "1.1"
+
 // Format identifies a renderer format.
 type Format string
 
@@ -21,9 +24,11 @@ type Output struct {
 	Module     string    `json:"module"`
 	Generated  time.Time `json:"generated_at"`
 
-	Source  SourceOutput  `json:"source"`
-	Summary SummaryOutput `json:"summary"`
-	Files   []FileOutput  `json:"affected"`
+	Source           SourceOutput            `json:"source"`
+	Summary          SummaryOutput           `json:"summary"`
+	Files            []FileOutput            `json:"affected"`
+	SuggestedActions *SuggestedActionsOutput `json:"suggested_actions,omitempty"`
+	FilterNote       string                  `json:"-"`
 }
 
 // SourceOutput describes the source file that was analyzed.
@@ -36,11 +41,26 @@ type SourceOutput struct {
 
 // SummaryOutput aggregates impact counts.
 type SummaryOutput struct {
-	AffectedCount int `json:"affected_count"`
-	DirectCount   int `json:"direct_count"`
-	IndirectCount int `json:"indirect_count"`
-	WithoutTests  int `json:"without_tests"`
-	MaxRiskScore  int `json:"max_risk_score"`
+	AffectedCount      int `json:"affected_count"`
+	DirectCount        int `json:"direct_count"`
+	IndirectCount      int `json:"indirect_count"`
+	WithoutTests       int `json:"without_tests"`
+	MaxRiskScore       int `json:"max_risk_score"`
+	TotalAffectedCount int `json:"total_affected_count,omitempty"`
+}
+
+// SuggestedActionsOutput provides agent-oriented next steps for analyze JSON.
+type SuggestedActionsOutput struct {
+	PackagesToTest   []string                `json:"packages_to_test"`
+	Commands         []string                `json:"commands"`
+	UntestedHighRisk []UntestedHighRiskEntry `json:"untested_high_risk"`
+}
+
+// UntestedHighRiskEntry describes a high-risk affected file without tests.
+type UntestedHighRiskEntry struct {
+	Path      string `json:"path"`
+	RiskScore int    `json:"risk_score"`
+	RiskBand  string `json:"risk_band"`
 }
 
 // FileOutput describes a single affected file entry.

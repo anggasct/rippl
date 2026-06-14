@@ -24,8 +24,9 @@ type FileEntry struct {
 
 // TUIOutput is the data contract for the TUI renderer.
 type TUIOutput struct {
-	Title string
-	Files []FileEntry
+	Title      string
+	Files      []FileEntry
+	FilterNote string
 }
 
 type listRowKind int
@@ -45,6 +46,7 @@ type listRow struct {
 // Model is the Bubble Tea model for the interactive TUI.
 type Model struct {
 	files              []FileEntry
+	filterNote         string
 	cursor             int
 	showDetail         bool
 	scrollOffset       int
@@ -58,9 +60,10 @@ type Model struct {
 // NewModel creates a new TUI model from the given output.
 func NewModel(out TUIOutput, noColor bool) Model {
 	return Model{
-		files:   out.Files,
-		cursor:  0,
-		noColor: noColor,
+		files:      out.Files,
+		filterNote: out.FilterNote,
+		cursor:     0,
+		noColor:    noColor,
 	}
 }
 
@@ -349,6 +352,9 @@ func (m Model) listView() string {
 	b.WriteString("\n")
 	footer := fmt.Sprintf("  %d/%d  ↑↓: navigate  PgUp/PgDn: scroll  d: detail  q: quit",
 		m.cursor+1, len(m.files))
+	if m.filterNote != "" {
+		footer = m.filterNote + "  |  " + footer
+	}
 	b.WriteString(m.styleFaint().Render(footer))
 
 	return b.String()
@@ -417,6 +423,9 @@ func (m Model) detailView() string {
 	b.WriteString("\n")
 	footer := fmt.Sprintf("  %d/%d  ↑↓: prev/next  PgUp/PgDn: scroll  d/esc: close  q: quit",
 		m.cursor+1, len(m.files))
+	if m.filterNote != "" {
+		footer = m.filterNote + "  |  " + footer
+	}
 	b.WriteString(m.styleFaint().Render(footer))
 
 	return b.String()
