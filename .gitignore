@@ -1,3 +1,6 @@
 .rippl/
 bin/
 /tmp/rippl
+
+# Track repo agent entrypoint (override global ignore)
+!AGENTS.md

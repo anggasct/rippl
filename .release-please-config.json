@@ -1,0 +1,9 @@
+{
+  "packages": {
+    ".": {
+      "package-name": "rippl",
+      "changelog-path": "CHANGELOG.md"
+    }
+  },
+  "include-component-in-tag": false
+}
