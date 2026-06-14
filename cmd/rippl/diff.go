@@ -50,10 +50,6 @@ func newDiffCmd() *cobra.Command {
 				return err
 			}
 
-			if !render.IsStructuredFormat(cfg.Output.Format) {
-				return fmt.Errorf("diff requires --format json or agent")
-			}
-
 			g, err := graph.LoadOrBuild(cmd.Context(), moduleRoot, cfg, noCache)
 			if err != nil {
 				return fmt.Errorf("load graph: %w", err)
@@ -108,10 +104,13 @@ func newDiffCmd() *cobra.Command {
 			actions := render.BuildSuggestedActions(synthetic, riskScores)
 
 			out := render.BuildDiffOutput(modulePath, ref, changed, files, summary, actions, time.Now().UTC())
-			if err := printJSON(cmd, out); err != nil {
-				return err
+			if render.IsStructuredFormat(cfg.Output.Format) {
+				if err := printJSON(cmd, out); err != nil {
+					return err
+				}
+				return advisoryUntestedHighRiskActions(actions)
 			}
-			return advisoryUntestedHighRiskActions(actions)
+			return printDiffText(cmd, modulePath, ref, changed, files, summary, actions)
 		},
 	}
 
@@ -142,74 +141,50 @@ func summarizeDiffFiles(changed []string, files []render.DiffFileOutput) render.
 	return summary
 }
 
-func newContextCmd() *cobra.Command {
-	var (
-		noCache bool
-		top     int
-	)
-
-	cmd := &cobra.Command{
-		Use:   "context <file>",
-		Short: "One-shot session bootstrap for agents",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			fileArg := args[0]
-			if err := validateFileArg(fileArg); err != nil {
-				return err
-			}
-
-			cfg := configForCmd(cmd)
-			format := effectiveContextFormat(cfg)
-			cfg.Output.Format = format
-
-			moduleRoot, err := resolveModuleRoot(fileArg)
-			if err != nil {
-				return err
-			}
-			relPath, err := resolveRelativeFilePath(moduleRoot, fileArg)
-			if err != nil {
-				return err
-			}
-
-			analysis, _, err := runImpactAnalysis(cmd.Context(), moduleRoot, relPath, cfg, noCache)
-			if err != nil {
-				return &config.ExitError{Code: 2, Err: err}
-			}
-
-			out := buildOutput(cfg, analysis.modulePath, analysis.result, analysis.riskScores, analysis.coverageInfo, top, 0)
-			if shouldCompactAnalyze(cfg, false) {
-				out = render.CompactAnalyzeOutput(out)
-			}
-
-			scoreOut := render.BuildScoreOutput(analysis.modulePath, relPath, analysis.riskScores[relPath], time.Now().UTC())
-			ctxOut := render.BuildContextOutput(
-				analysis.modulePath,
-				relPath,
-				out.Summary,
-				out.Source,
-				render.BuildContextScore(scoreOut),
-				out.Files,
-				out.SuggestedActions,
-				time.Now().UTC(),
-			)
-
-			if err := printJSON(cmd, ctxOut); err != nil {
-				return err
-			}
-			return advisoryUntestedHighRiskActions(out.SuggestedActions)
-		},
+func printDiffText(cmd *cobra.Command, modulePath, ref string, changed []string, files []render.DiffFileOutput, summary render.DiffSummaryOutput, actions *render.SuggestedActionsOutput) error {
+	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Diff: %s @ %s\n", modulePath, ref); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Changed: %d files\n", summary.ChangedCount); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Affected: %d files (direct: %d, indirect: %d)\n", summary.AffectedCount, summary.DirectCount, summary.IndirectCount); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintf(cmd.OutOrStdout(), "Without tests: %d  Max risk: %d\n", summary.WithoutTests, summary.MaxRiskScore); err != nil {
+		return err
 	}
 
-	cmd.Flags().BoolVar(&noCache, "no-cache", false, "Force cold graph build")
-	cmd.Flags().IntVar(&top, "top", 15, "Max affected entries in output (0 = all)")
-	return cmd
-}
-
-func effectiveContextFormat(cfg *config.Config) string {
-	switch strings.ToLower(cfg.Output.Format) {
-	case string(render.FormatJSON), string(render.FormatAgent):
-		return cfg.Output.Format
-	default:
-		return string(render.FormatAgent)
+	if len(files) > 0 {
+		if _, err := fmt.Fprintln(cmd.OutOrStdout(), "\nAffected files:"); err != nil {
+			return err
+		}
+		for i, f := range files {
+			chain := strings.Join(f.Chain, " -> ")
+			if chain == "" {
+				chain = f.Path
+			}
+			testStatus := ""
+			if !f.HasTestFile {
+				testStatus = " [no test]"
+			}
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "  %d. [%s] %s (depth=%d, risk=%d, coverage=%.0f%%)%s\n",
+				i+1, strings.ToUpper(f.ImpactLevel), chain, f.Depth, f.RiskScore, f.Coverage, testStatus); err != nil {
+				return err
+			}
+		}
 	}
+
+	if actions != nil && len(actions.UntestedHighRisk) > 0 {
+		if _, err := fmt.Fprintln(cmd.OutOrStdout(), "\nHigh-risk untested files:"); err != nil {
+			return err
+		}
+		for _, u := range actions.UntestedHighRisk {
+			if _, err := fmt.Fprintf(cmd.OutOrStdout(), "  ! %s (risk=%d, band=%s)\n", u.Path, u.RiskScore, u.RiskBand); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

@@ -10,5 +10,3 @@ func Foo() {
 }
 
 func (Type) Method() {}
-
-func CachedStale() {}
