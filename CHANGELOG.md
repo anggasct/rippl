@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/anggasct/rippl/compare/v0.2.0...v0.3.0) (2026-06-14)
+
+
+### Features
+
+* agent integration (JSON export, diff, context, config example) ([#21](https://github.com/anggasct/rippl/issues/21)) ([89ebce3](https://github.com/anggasct/rippl/commit/89ebce3c93e660d5d9a2ba3afee635f95fd98413))
+
 ## [0.2.0](https://github.com/anggasct/rippl/compare/v0.1.1...v0.2.0) (2026-06-14)
 
 
