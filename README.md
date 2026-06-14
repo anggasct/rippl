@@ -6,7 +6,7 @@ Go CLI for change impact analysis in Go modules — see which files a change aff
 
 ## Install
 
-Requires [Go 1.22+](https://go.dev/dl/).
+Requires [Go 1.24+](https://go.dev/dl/).
 
 ```bash
 go install github.com/anggasct/rippl/cmd/rippl@latest
