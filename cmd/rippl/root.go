@@ -43,7 +43,7 @@ func newRootCmd() *cobra.Command {
 	rootCmd.SilenceUsage = true
 	rootCmd.SilenceErrors = true
 
-	rootCmd.PersistentFlags().StringVar(&flags.format, "format", defaultFormat(), "Output format: tui, json, mermaid, text")
+	rootCmd.PersistentFlags().StringVar(&flags.format, "format", defaultFormat(), "Output format: tui, json, agent, mermaid, text")
 	rootCmd.PersistentFlags().IntVar(&flags.maxDepth, "max-depth", 3, "Impact traversal depth")
 	rootCmd.PersistentFlags().StringVar(&flags.since, "since", "12 months", "Git history window for risk signals")
 	rootCmd.PersistentFlags().BoolVar(&flags.noCache, "no-cache", false, "Force cold graph build")
@@ -55,6 +55,8 @@ func newRootCmd() *cobra.Command {
 		newScoreCmd(),
 		newTestCmd(),
 		newGraphCmd(),
+		newDiffCmd(),
+		newContextCmd(),
 		newVersionCmd(),
 	)
 
@@ -89,7 +91,9 @@ func prepareRuntime(cmd *cobra.Command, args []string, flags *cliFlags) error {
 		return &config.ExitError{Code: 1, Err: err}
 	}
 
-	applyFlagOverrides(cmd, cfg, loadedFromFile, flags)
+	if err := applyFlagOverrides(cmd, cfg, loadedFromFile, flags); err != nil {
+		return err
+	}
 
 	if err := config.EnsureCacheDir(root, cfg.Cache.Dir); err != nil {
 		return &config.ExitError{Code: 1, Err: err}
@@ -100,9 +104,14 @@ func prepareRuntime(cmd *cobra.Command, args []string, flags *cliFlags) error {
 	return nil
 }
 
-func applyFlagOverrides(cmd *cobra.Command, cfg *config.Config, loadedFromFile bool, flags *cliFlags) {
+func applyFlagOverrides(cmd *cobra.Command, cfg *config.Config, loadedFromFile bool, flags *cliFlags) error {
 	if cmd.Flags().Changed("format") {
 		cfg.Output.Format = flags.format
+	} else if env := os.Getenv("RIPPL_FORMAT"); env != "" {
+		if err := validateFormat(env); err != nil {
+			return err
+		}
+		cfg.Output.Format = env
 	} else if !loadedFromFile {
 		cfg.Output.Format = defaultFormat()
 	}
@@ -122,11 +131,12 @@ func applyFlagOverrides(cmd *cobra.Command, cfg *config.Config, loadedFromFile b
 	}
 
 	_ = flags.noCache
+	return nil
 }
 
 func commandUsesFileArg(name string) bool {
 	switch name {
-	case "analyze", "score", "test":
+	case "analyze", "score", "test", "context":
 		return true
 	default:
 		return false
