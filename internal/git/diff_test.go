@@ -10,7 +10,7 @@ func TestChangedGoFiles(t *testing.T) {
 
 	runner := &MockRunner{
 		Responses: map[string][]byte{
-			"rev-parse --is-inside-work-tree": []byte("true\n"),
+			"rev-parse --is-inside-work-tree":          []byte("true\n"),
 			"diff --name-only --diff-filter=ACMR HEAD": []byte("pkg/alpha/alpha.go\npkg/beta/beta.go\nREADME.md\n"),
 		},
 	}
