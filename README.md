@@ -1,24 +1,103 @@
 # Rippl
 
-Go CLI for change impact analysis in Go modules.
+Go CLI for change impact analysis in Go modules — see which files a change affects, how risky they are, and which tests to run.
 
-## Build
+![rippl analyze demo](assets/demo.gif)
+
+## Install
+
+Requires [Go 1.22+](https://go.dev/dl/).
 
 ```bash
+go install github.com/anggasct/rippl/cmd/rippl@latest
+```
+
+Or build from source:
+
+```bash
+git clone https://github.com/anggasct/rippl.git
+cd rippl
 go build -o rippl ./cmd/rippl
 ```
 
-## Usage
+## Quick start
+
+From the root of any Go module:
 
 ```bash
-rippl --help
-rippl analyze <file>
-rippl score <file>
-rippl test <file>
-rippl graph
+# Impact analysis (TUI when stdout is a terminal; use --format text in scripts)
+rippl analyze internal/auth/jwt.go
+
+# Risk score breakdown
+rippl score internal/auth/jwt.go
+
+# Run tests in packages affected by a change
+rippl test internal/auth/jwt.go
+
+# Export the full dependency graph
+rippl graph --format mermaid
 ```
 
-Optional config: `.rippl.yaml` at module root. Cache is stored under `.rippl/cache/` — add `.rippl/` to your project's `.gitignore`.
+Export formats for `analyze` and `graph`:
+
+```bash
+rippl analyze handler.go --format json
+rippl analyze handler.go --format mermaid
+rippl graph --format json
+```
+
+Optional config: `.rippl.yaml` at module root. Graph cache is stored under `.rippl/cache/` — add `.rippl/` to your `.gitignore`.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    shell[Developer shell]
+    cli["cmd/rippl — Cobra CLI"]
+    engine[Engine pipeline]
+    cache[".rippl/cache/"]
+
+    shell --> cli
+    cli --> engine
+    engine --> cache
+
+    subgraph engine [Engine]
+        parser[parser]
+        graph[graph]
+        git[git]
+        scorer[scorer]
+        testmap[testmap]
+        impact[impact BFS]
+        render[render]
+        parser --> graph
+        graph --> git
+        graph --> scorer
+        graph --> testmap
+        graph --> impact
+        impact --> render
+    end
+```
+
+Commands: `analyze` | `score` | `test` | `graph`
+
+## Known limits
+
+| Limitation | MVP behavior |
+|------------|--------------|
+| Dynamic calls / reflection | Not tracked; may miss edges |
+| Implicit interface satisfaction | Skipped (planned Phase 2) |
+| Generated code | Ignored via config patterns |
+| Cross-module internal deps | Module boundary only |
+
+## Releasing
+
+Rippl ships as a Go module — no separate release binaries.
+
+1. Tag a semver release: `git tag v0.1.0 && git push origin v0.1.0`
+2. Install a pinned version: `go install github.com/anggasct/rippl/cmd/rippl@v0.1.0`
+3. Install latest: `go install github.com/anggasct/rippl/cmd/rippl@latest`
+
+`rippl version` prints `dev` when built from source without release ldflags.
 
 ## Local development
 
@@ -26,7 +105,7 @@ One-time setup:
 
 ```bash
 make install-tools   # golangci-lint
-make setup-hooks     # pre-commit hook → runs `make check-fast` (gofmt + vet)
+make setup-hooks     # pre-commit hook → runs make check-fast (gofmt + vet)
 ```
 
 Run the full CI-equivalent checks before you push:
@@ -39,12 +118,18 @@ Pre-commit runs a fast subset (`gofmt` + `go vet`); CI runs the full suite.
 
 Individual targets: `make check-fast`, `make bench-graph`, `make test`, `make lint`, `make vet`, `make fmt`, `make build`.
 
-## Verify
+### Regenerate demo GIF
+
+Requires [vhs](https://github.com/charmbracelet/vhs), `ffmpeg`, and `ttyd`:
 
 ```bash
-make check
+sed "s|REPO_ROOT|$(pwd)|g" assets/demo.tape | vhs -
 ```
 
 ## Documentation
 
 Delivery specs and process live in `project-docs/` (see [AGENTS.md](AGENTS.md)).
+
+## License
+
+MIT — see [LICENSE](LICENSE).

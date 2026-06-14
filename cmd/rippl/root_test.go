@@ -170,6 +170,42 @@ func TestAnalyzeInModuleWithFile(t *testing.T) {
 	}
 }
 
+func TestAnalyzeInModuleWithRelativeFile(t *testing.T) {
+	moduleRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(moduleRoot, "go.mod"), []byte("module example.com/test\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(moduleRoot, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	origWD, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origWD)
+	})
+	if err := os.Chdir(moduleRoot); err != nil {
+		t.Fatal(err)
+	}
+
+	cmd := newRootCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(os.Stderr)
+	cmd.SetArgs([]string{"analyze", "--format", "text", "main.go"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+
+	output := out.String()
+	if !strings.Contains(output, "Source:") {
+		t.Fatalf("output missing 'Source:' header, got: %q", output)
+	}
+}
+
 func TestAnalyzeDirectoryReturnsExitError2(t *testing.T) {
 	t.Parallel()
 
