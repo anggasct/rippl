@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/anggasct/rippl/internal/config"
@@ -130,10 +129,6 @@ func commandUsesFileArg(name string) bool {
 	default:
 		return false
 	}
-}
-
-func printNotImplemented(cmd *cobra.Command) {
-	_, _ = fmt.Fprintln(cmd.ErrOrStderr(), "not implemented")
 }
 
 type ctxKey string
