@@ -84,26 +84,11 @@ Run `rippl <command> --help` for full flag details.
 | `analyze`, `score`, `test`, `graph` | `--no-cache` | Force cold graph build (also available as a global flag) |
 | `graph` | `--package <prefix>` | Limit export to a package subgraph |
 
-### Interactive TUI
-
-When stdout is a terminal, `rippl analyze <file>` opens an interactive UI (override with `--format text` or `--format json` for scripts).
-
-| Key | Action |
-|-----|--------|
-| ↑ / ↓, `j` / `k` | Move selection (works in list and detail views) |
-| PgUp / PgDn, Ctrl+U / Ctrl+D | Scroll the viewport |
-| Mouse wheel | Scroll the list |
-| `d` | Toggle detail panel for the selected file |
-| `Esc` | Close detail panel |
-| `q` | Quit |
-
-The footer shows your position as `N/total` affected files.
-
 ### Tips
 
 - **Scripts and CI:** use `--format json` for machine-readable output, or `--format text` for a short summary.
 - **Long text output:** `analyze --format text` shows up to 20 affected files, then `... and N more`; JSON always includes the full list.
-- **Config:** optional `.rippl.yaml` at module root.
+- **Config:** optional `.rippl.yaml` at module root — copy from [`.rippl.yaml.example`](.rippl.yaml.example) to get started.
 - **Cache:** graph cache lives under `.rippl/cache/` — add `.rippl/` to `.gitignore`.
 
 ## Architecture

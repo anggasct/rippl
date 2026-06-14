@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/anggasct/rippl/internal/config"
 	"github.com/anggasct/rippl/internal/graph"
+	"github.com/anggasct/rippl/internal/render"
 	"github.com/anggasct/rippl/internal/scorer"
 	"github.com/anggasct/rippl/internal/testmap"
 	"github.com/spf13/cobra"
@@ -24,6 +27,9 @@ func newScoreCmd() *cobra.Command {
 			}
 
 			cfg := configForCmd(cmd)
+			if err := rejectAgentFormat(cfg, "score"); err != nil {
+				return err
+			}
 			moduleRoot, err := resolveModuleRoot(fileArg)
 			if err != nil {
 				return err
@@ -62,6 +68,14 @@ func newScoreCmd() *cobra.Command {
 				return fmt.Errorf("scorer returned no result for %q", relPath)
 			}
 
+			modulePath, err := config.ModulePath(moduleRoot)
+			if err != nil {
+				return err
+			}
+
+			if strings.EqualFold(cfg.Output.Format, string(render.FormatJSON)) {
+				return printScoreJSON(cmd, modulePath, relPath, result)
+			}
 			return printScoreBreakdown(cmd, relPath, result)
 		},
 	}

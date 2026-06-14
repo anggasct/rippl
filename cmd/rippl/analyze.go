@@ -20,6 +20,7 @@ func newAnalyzeCmd() *cobra.Command {
 		noCache bool
 		top     int
 		minRisk int
+		compact bool
 	)
 
 	cmd := &cobra.Command{
@@ -91,11 +92,12 @@ func newAnalyzeCmd() *cobra.Command {
 			}
 
 			out := buildOutput(cfg, modulePath, result, riskScores, coverageInfo, top, minRisk)
-			return renderOutput(cmd, cfg, out)
+			return renderAnalyzeOutput(cmd, cfg, out, compact)
 		},
 	}
 
 	cmd.Flags().BoolVar(&noCache, "no-cache", false, "Force cold graph build")
+	cmd.Flags().BoolVar(&compact, "compact", false, "Omit chain arrays in JSON output (with --format json)")
 	cmd.Flags().IntVar(&top, "top", 0, "Max affected entries in output (0 = all)")
 	cmd.Flags().IntVar(&minRisk, "min-risk", 0, "Min risk score 0-100 (0 = off)")
 
@@ -173,7 +175,7 @@ func buildOutput(
 	}
 
 	totalAffected := len(out.Files)
-	if strings.EqualFold(cfg.Output.Format, string(render.FormatJSON)) {
+	if render.IsStructuredFormat(cfg.Output.Format) {
 		out.SuggestedActions = render.BuildSuggestedActions(result, riskScores)
 	}
 
@@ -214,6 +216,33 @@ func coveragePct(fc testmap.FileCoverage) float64 {
 		return *fc.CoveragePct
 	}
 	return 0
+}
+
+func renderAnalyzeOutput(cmd *cobra.Command, cfg *config.Config, out render.Output, compact bool) error {
+	if shouldCompactAnalyze(cfg, compact) {
+		out = render.CompactAnalyzeOutput(out)
+	}
+	if err := renderOutput(cmd, cfg, out); err != nil {
+		return err
+	}
+	return advisoryUntestedHighRisk(cfg, out)
+}
+
+func shouldCompactAnalyze(cfg *config.Config, compact bool) bool {
+	if strings.EqualFold(cfg.Output.Format, string(render.FormatAgent)) {
+		return true
+	}
+	return compact && strings.EqualFold(cfg.Output.Format, string(render.FormatJSON))
+}
+
+func advisoryUntestedHighRisk(cfg *config.Config, out render.Output) error {
+	if !render.IsStructuredFormat(cfg.Output.Format) {
+		return nil
+	}
+	if out.SuggestedActions == nil || len(out.SuggestedActions.UntestedHighRisk) == 0 {
+		return nil
+	}
+	return &config.ExitError{Code: 4, Err: errors.New("untested high-risk files present")}
 }
 
 func renderOutput(cmd *cobra.Command, cfg *config.Config, out render.Output) error {

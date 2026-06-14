@@ -30,7 +30,7 @@ func NewRendererWithWriter(format string, w io.Writer) (Renderer, error) {
 // Used by callers that need to disable ANSI colors (e.g. --no-color flag).
 func NewRendererWithWriterAndColor(format string, w io.Writer, noColor bool) (Renderer, error) {
 	switch Format(strings.ToLower(format)) {
-	case FormatJSON:
+	case FormatJSON, FormatAgent:
 		return &jsonRenderer{out: w}, nil
 	case FormatMermaid:
 		return &mermaidRenderer{out: w}, nil

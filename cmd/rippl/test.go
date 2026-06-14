@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/anggasct/rippl/internal/config"
 	"github.com/anggasct/rippl/internal/graph"
 	"github.com/anggasct/rippl/internal/packages"
+	"github.com/anggasct/rippl/internal/render"
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +30,9 @@ func newTestCmd() *cobra.Command {
 			}
 
 			cfg := configForCmd(cmd)
+			if err := rejectAgentFormat(cfg, "test"); err != nil {
+				return err
+			}
 			moduleRoot, err := resolveModuleRoot(fileArg)
 			if err != nil {
 				return err
@@ -48,14 +53,27 @@ func newTestCmd() *cobra.Command {
 				return &config.ExitError{Code: 2, Err: err}
 			}
 
-			packages, skipped := packages.AffectedWithTests(g, result)
+			allDirs := packages.UniqueDirs(result)
+			runDirs, skippedCount := packages.WithTests(g, allDirs)
+			skippedDirs := packages.SkippedDirs(allDirs, runDirs)
 
-			if len(packages) == 0 {
+			if strings.EqualFold(cfg.Output.Format, string(render.FormatJSON)) {
+				modulePath, err := config.ModulePath(moduleRoot)
+				if err != nil {
+					return err
+				}
+				if len(runDirs) == 0 {
+					return printTestJSONEmpty(cmd, modulePath, relPath, skippedDirs)
+				}
+				return runTestsJSON(cmd.Context(), cmd, moduleRoot, modulePath, relPath, runDirs, skippedDirs)
+			}
+
+			if len(runDirs) == 0 {
 				_, err := fmt.Fprintln(cmd.OutOrStdout(), "no affected packages with tests")
 				return err
 			}
 
-			return runTests(cmd.Context(), cmd, moduleRoot, packages, skipped)
+			return runTestsText(cmd.Context(), cmd, moduleRoot, runDirs, skippedCount)
 		},
 	}
 
@@ -64,17 +82,17 @@ func newTestCmd() *cobra.Command {
 	return cmd
 }
 
-// runTests executes `go test ./<pkgDir/...>` for each package. It prints
+// runTestsText executes `go test ./<pkgDir/...>` for each package. It prints
 // per-package results and a summary. If any `go test` invocation fails, it
 // returns ExitError{Code: 1} to propagate the failure.
-func runTests(ctx context.Context, cmd *cobra.Command, moduleRoot string, packages []string, skipped int) error {
+func runTestsText(ctx context.Context, cmd *cobra.Command, moduleRoot string, runDirs []string, skipped int) error {
 	out := cmd.OutOrStdout()
 	errOut := cmd.ErrOrStderr()
 
 	totalRun := 0
 	failed := false
 
-	for _, pkgDir := range packages {
+	for _, pkgDir := range runDirs {
 		relPkgDir, err := filepath.Rel(moduleRoot, pkgDir)
 		if err != nil {
 			relPkgDir = pkgDir

@@ -11,6 +11,7 @@ type Format string
 const (
 	FormatText    Format = "text"
 	FormatJSON    Format = "json"
+	FormatAgent   Format = "agent"
 	FormatMermaid Format = "mermaid"
 	FormatTUI     Format = "tui"
 )
@@ -72,6 +73,6 @@ type FileOutput struct {
 	RiskBand    string   `json:"risk_band"`
 	Coverage    float64  `json:"coverage_pct"`
 	HasTestFile bool     `json:"has_test_file"`
-	Chain       []string `json:"chain"`
+	Chain       []string `json:"chain,omitempty"`
 	Reason      string   `json:"reason"`
 }

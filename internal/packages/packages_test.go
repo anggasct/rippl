@@ -95,3 +95,20 @@ func TestAffectedWithTests(t *testing.T) {
 		t.Fatalf("skipped = %d, want >= 0", skipped)
 	}
 }
+
+func TestSkippedDirs(t *testing.T) {
+	t.Parallel()
+
+	all := []string{"pkg/alpha", "pkg/beta", "pkg/gamma"}
+	tested := []string{"pkg/alpha", "pkg/gamma"}
+	got := SkippedDirs(all, tested)
+	want := []string{"pkg/beta"}
+	if len(got) != len(want) {
+		t.Fatalf("SkippedDirs() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("SkippedDirs()[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}

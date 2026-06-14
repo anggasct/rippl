@@ -1,0 +1,65 @@
+# Rippl configuration (optional)
+#
+# Copy this file to .rippl.yaml in your Go module root (next to go.mod).
+# Rippl works without any config file — these values match the built-in defaults.
+#
+# Override path: rippl analyze handler.go --config path/to/.rippl.yaml
+# Env override:  RIPPL_FORMAT=json rippl analyze handler.go  (when --format is not set)
+#
+# CLI flags take precedence over this file when you pass them explicitly
+# (e.g. --max-depth, --since, --format, --no-cache).
+
+version: 1
+
+# Languages to analyze. MVP supports Go only.
+languages:
+  - go
+
+# Glob patterns (doublestar) for files excluded from the dependency graph.
+# If you customize this list, include any defaults you still want.
+ignore:
+  - "vendor/**"        # vendored third-party code
+  - "**/*_string.go"   # stringer and similar generated files
+  - "**/mock_*.go"     # common mock file naming
+  # - "**/*.pb.go"     # protobuf generated (uncomment to ignore)
+  # - "**/gen/**"      # codegen output directory
+
+risk:
+  # Six-signal heuristic weights (integers 0–100; should sum to ~100).
+  weights:
+    bug_fix_ratio: 25   # share of commits that look like bug fixes
+    author_count: 15    # many authors → higher coordination risk
+    churn_rate: 15      # lines changed in git window
+    stale_age: 10       # time since last modification
+    fan_out: 20         # number of dependent files in the graph
+    test_coverage: 15   # lower coverage → higher risk contribution
+
+  # Git log message patterns (regex) counted as bug-fix commits.
+  bug_fix_patterns:
+    - '\bfix(ed|es)?\b'
+    - '\bbug\b'
+    - '\bhotfix\b'
+    - '\bpatch\b'
+
+  # Git history window for risk signals (passed to git log).
+  since: "12 months"
+
+impact:
+  # BFS depth for blast-radius analysis (same as --max-depth).
+  max_depth: 3
+
+  # Include *_test.go files as graph nodes when tracing impact.
+  include_tests: true
+
+output:
+  # Default output format when stdout is a TTY: tui | text | json | mermaid | agent
+  # When piped (non-TTY), default is text unless RIPPL_FORMAT is set.
+  format: tui
+
+  # ANSI colors for TUI/text: auto | true | false
+  color: auto
+
+cache:
+  # Dependency graph cache directory (relative to module root).
+  # Add .rippl/ to .gitignore — see README.
+  dir: ".rippl/cache"

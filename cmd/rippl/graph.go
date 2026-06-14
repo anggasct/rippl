@@ -22,6 +22,9 @@ func newGraphCmd() *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := configForCmd(cmd)
+			if err := rejectAgentFormat(cfg, "graph"); err != nil {
+				return err
+			}
 
 			cwd, err := os.Getwd()
 			if err != nil {
