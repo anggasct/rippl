@@ -1,7 +1,10 @@
 package tui
 
 import (
+	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestRiskBand(t *testing.T) {
@@ -120,36 +123,109 @@ func TestNewModel(t *testing.T) {
 	}
 }
 
-func TestModelGroupFiles(t *testing.T) {
+func TestBuildListRowsIncludesHeaders(t *testing.T) {
 	t.Parallel()
-	m := NewModel(TUIOutput{
-		Files: []FileEntry{
-			{Path: "a.go", ImpactLevel: "direct"},
-			{Path: "b.go", ImpactLevel: "indirect"},
-			{Path: "c.go", ImpactLevel: "direct"},
-		},
-	}, false)
-	direct, indirect := m.groupFiles()
-	if len(direct) != 2 {
-		t.Errorf("direct count = %d, want 2", len(direct))
+	m := NewModel(fixture48(), false)
+	rows := m.buildListRows()
+
+	var headers int
+	var files int
+	for _, row := range rows {
+		switch row.kind {
+		case rowHeader:
+			headers++
+		case rowFile:
+			files++
+		}
 	}
-	if len(indirect) != 1 {
-		t.Errorf("indirect count = %d, want 1", len(indirect))
+	if headers != 2 {
+		t.Fatalf("header count = %d, want 2", headers)
+	}
+	if files != 48 {
+		t.Fatalf("file row count = %d, want 48", files)
 	}
 }
 
-func TestModelGlobalIndex(t *testing.T) {
-	t.Parallel()
-	m := NewModel(TUIOutput{
-		Files: []FileEntry{
-			{Path: "a.go"},
-			{Path: "b.go"},
-			{Path: "c.go"},
-		},
-	}, false)
-	if m.globalIndex(m.files[1]) != 1 {
-		t.Errorf("globalIndex(b.go) = %d, want 1", m.globalIndex(m.files[1]))
+func TestModelNavigateDown(t *testing.T) {
+	m := NewModel(fixture48(), false)
+	for range 47 {
+		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = next.(Model)
 	}
+	if m.cursor != 47 {
+		t.Fatalf("cursor = %d, want 47", m.cursor)
+	}
+}
+
+func TestModelNavigateUp(t *testing.T) {
+	m := NewModel(fixture48(), false)
+	for range 6 {
+		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = next.(Model)
+	}
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = next.(Model)
+	if m.cursor != 5 {
+		t.Fatalf("cursor = %d, want 5", m.cursor)
+	}
+}
+
+func TestModelNavigateInDetail(t *testing.T) {
+	m := NewModel(fixture48(), false)
+	next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	m = next.(Model)
+	if !m.showDetail {
+		t.Fatal("showDetail should be true after d")
+	}
+	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = next.(Model)
+	if m.cursor != 1 {
+		t.Fatalf("cursor = %d, want 1 in detail mode", m.cursor)
+	}
+}
+
+func TestListViewShowsCursorOnSelectedFile(t *testing.T) {
+	m := NewModel(fixture48(), true)
+	m.height = 30
+	for range 31 {
+		next, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		m = next.(Model)
+	}
+	view := m.listView()
+	if !strings.Contains(view, "> ") {
+		t.Fatalf("list view missing cursor marker:\n%s", view)
+	}
+	if !strings.Contains(view, "f31.go") {
+		t.Fatalf("list view should show selected file f31.go:\n%s", view)
+	}
+}
+
+func fixture48() TUIOutput {
+	files := make([]FileEntry, 48)
+	for i := range files {
+		level := "direct"
+		if i >= 31 {
+			level = "indirect"
+		}
+		files[i] = FileEntry{
+			Path:        "f" + itoa(i) + ".go",
+			ImpactLevel: level,
+			RiskScore:   50,
+		}
+	}
+	return TUIOutput{Files: files}
+}
+
+func itoa(i int) string {
+	if i == 0 {
+		return "0"
+	}
+	var digits []byte
+	for i > 0 {
+		digits = append([]byte{byte('0' + i%10)}, digits...)
+		i /= 10
+	}
+	return string(digits)
 }
 
 func TestModelVisibleLines(t *testing.T) {

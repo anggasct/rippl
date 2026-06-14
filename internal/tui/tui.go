@@ -28,6 +28,20 @@ type TUIOutput struct {
 	Files []FileEntry
 }
 
+type listRowKind int
+
+const (
+	rowHeader listRowKind = iota
+	rowFile
+)
+
+type listRow struct {
+	kind    listRowKind
+	title   string
+	color   string
+	fileIdx int
+}
+
 // Model is the Bubble Tea model for the interactive TUI.
 type Model struct {
 	files        []FileEntry
@@ -64,26 +78,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "up", "k":
-			if m.showDetail {
-				break
-			}
-			if m.cursor > 0 {
-				m.cursor--
-				if m.cursor < m.scrollOffset {
-					m.scrollOffset = m.cursor
-				}
-			}
+			m.moveCursor(-1)
 
 		case "down", "j":
-			if m.showDetail {
-				break
-			}
-			if m.cursor < len(m.files)-1 {
-				m.cursor++
-				if m.cursor >= m.scrollOffset+m.visibleLines() {
-					m.scrollOffset++
-				}
-			}
+			m.moveCursor(1)
 
 		case "d":
 			if len(m.files) > 0 {
@@ -99,9 +97,104 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.ensureCursorVisible()
 	}
 
 	return m, nil
+}
+
+func (m *Model) moveCursor(delta int) {
+	if len(m.files) == 0 {
+		return
+	}
+	next := m.cursor + delta
+	if next < 0 || next >= len(m.files) {
+		return
+	}
+	m.cursor = next
+	m.ensureCursorVisible()
+}
+
+func (m *Model) buildListRows() []listRow {
+	if len(m.files) == 0 {
+		return nil
+	}
+
+	rows := make([]listRow, 0, len(m.files)+2)
+	var currentGroup string
+
+	for i, f := range m.files {
+		group := impactGroupTitle(f.ImpactLevel)
+		if group != currentGroup {
+			color := riskColor("medium", m.noColor)
+			if f.ImpactLevel == "direct" {
+				color = riskColor("high", m.noColor)
+			}
+			rows = append(rows, listRow{
+				kind:  rowHeader,
+				title: group,
+				color: color,
+			})
+			currentGroup = group
+		}
+		rows = append(rows, listRow{
+			kind:    rowFile,
+			fileIdx: i,
+		})
+	}
+	return rows
+}
+
+func impactGroupTitle(level string) string {
+	switch level {
+	case "direct":
+		return "Direct Impact"
+	case "indirect":
+		return "Indirect Impact"
+	default:
+		return strings.ToUpper(level)
+	}
+}
+
+func (m *Model) cursorRowIndex(rows []listRow) int {
+	for i, row := range rows {
+		if row.kind == rowFile && row.fileIdx == m.cursor {
+			return i
+		}
+	}
+	return 0
+}
+
+func (m *Model) ensureCursorVisible() {
+	rows := m.buildListRows()
+	if len(rows) == 0 {
+		m.scrollOffset = 0
+		return
+	}
+
+	cursorRow := m.cursorRowIndex(rows)
+	vis := m.visibleLines()
+	if vis < 1 {
+		vis = 1
+	}
+
+	if cursorRow < m.scrollOffset {
+		m.scrollOffset = cursorRow
+	}
+	if cursorRow >= m.scrollOffset+vis {
+		m.scrollOffset = cursorRow - vis + 1
+	}
+
+	maxOffset := len(rows) - vis
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if m.scrollOffset > maxOffset {
+		m.scrollOffset = maxOffset
+	}
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
 }
 
 // View implements tea.Model.
@@ -123,31 +216,70 @@ func (m Model) listView() string {
 		return "No affected files.\n"
 	}
 
+	rows := m.buildListRows()
+
 	var b strings.Builder
 
-	// Header
 	headerStyle := m.styleBoldUnderline()
 	b.WriteString(headerStyle.Render("Affected Files"))
 	b.WriteString("\n\n")
 
-	// Group files by impact level
-	direct, indirect := m.groupFiles()
-
-	if len(direct) > 0 {
-		b.WriteString(m.renderGroup("Direct Impact", direct, riskColor("high", m.noColor)))
-		b.WriteString("\n")
+	vis := m.visibleLines()
+	end := m.scrollOffset + vis
+	if end > len(rows) {
+		end = len(rows)
 	}
 
-	if len(indirect) > 0 {
-		b.WriteString(m.renderGroup("Indirect Impact", indirect, riskColor("medium", m.noColor)))
-		b.WriteString("\n")
+	for i := m.scrollOffset; i < end; i++ {
+		row := rows[i]
+		switch row.kind {
+		case rowHeader:
+			groupStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(row.color))
+			if m.noColor {
+				groupStyle = lipgloss.NewStyle()
+			}
+			b.WriteString(groupStyle.Render(row.title))
+			b.WriteString("\n")
+		case rowFile:
+			b.WriteString(m.renderFileLine(m.files[row.fileIdx], row.fileIdx == m.cursor))
+		}
 	}
 
-	// Footer
 	b.WriteString("\n")
 	b.WriteString(m.styleFaint().Render("  up/down: navigate  d: detail  q: quit"))
 
 	return b.String()
+}
+
+func (m Model) renderFileLine(f FileEntry, selected bool) string {
+	cursor := "  "
+	if selected {
+		cursorStyle := lipgloss.NewStyle().Bold(true)
+		if m.noColor {
+			cursorStyle = lipgloss.NewStyle()
+		}
+		cursor = cursorStyle.Render("> ")
+	}
+
+	band := riskBand(f.RiskScore)
+	riskColorName := riskColor(band, m.noColor)
+	riskStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(riskColorName))
+	if m.noColor {
+		riskStyle = lipgloss.NewStyle()
+	}
+
+	testStatus := ""
+	if !f.HasTestFile {
+		testStatus = " [no test]"
+	}
+
+	return fmt.Sprintf("%s[%s] %s (risk=%d)%s\n",
+		cursor,
+		riskStyle.Render(padRight(band, 8)),
+		truncate(f.Path, 40),
+		f.RiskScore,
+		testStatus,
+	)
 }
 
 // detailView renders the detail panel for the selected file.
@@ -183,97 +315,12 @@ func (m Model) detailView() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(m.styleFaint().Render("  d/esc: close detail  q: quit"))
+	b.WriteString(m.styleFaint().Render("  up/down: prev/next file  d/esc: close  q: quit"))
 
 	return b.String()
 }
 
-// groupFiles splits files into direct and indirect groups, preserving order.
-func (m Model) groupFiles() (direct, indirect []FileEntry) {
-	for _, f := range m.files {
-		switch f.ImpactLevel {
-		case "direct":
-			direct = append(direct, f)
-		case "indirect":
-			indirect = append(indirect, f)
-		}
-	}
-	return
-}
-
-// renderGroup renders a group of files under a colored heading.
-func (m Model) renderGroup(title string, files []FileEntry, color string) string {
-	var b strings.Builder
-
-	groupStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(color))
-	if m.noColor {
-		groupStyle = lipgloss.NewStyle()
-	}
-	b.WriteString(groupStyle.Render(title))
-	b.WriteString("\n")
-
-	// Calculate visible range based on viewport
-	visLines := m.visibleLines()
-	end := m.scrollOffset + visLines
-	if end > len(files) {
-		end = len(files)
-	}
-	start := m.scrollOffset
-	if start > end {
-		start = end
-	}
-
-	for i := start; i < end; i++ {
-		f := files[i]
-		globalIdx := m.globalIndex(f)
-
-		cursor := "  "
-		if m.cursor == globalIdx {
-			cursorStyle := lipgloss.NewStyle().Bold(true)
-			if m.noColor {
-				cursorStyle = lipgloss.NewStyle()
-			}
-			cursor = cursorStyle.Render("> ")
-		}
-
-		band := riskBand(f.RiskScore)
-		riskColorName := riskColor(band, m.noColor)
-		riskStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(riskColorName))
-		if m.noColor {
-			riskStyle = lipgloss.NewStyle()
-		}
-
-		testStatus := ""
-		if !f.HasTestFile {
-			testStatus = " [no test]"
-		}
-
-		line := fmt.Sprintf("%s[%s] %s (risk=%d)%s\n",
-			cursor,
-			riskStyle.Render(padRight(band, 8)),
-			truncate(f.Path, 40),
-			f.RiskScore,
-			testStatus,
-		)
-		b.WriteString(line)
-	}
-
-	return b.String()
-}
-
-// globalIndex returns the index of target in m.files.
-// Note: uses path comparison; duplicate paths are impossible by construction
-// since the engine produces unique file paths per analysis run.
-func (m Model) globalIndex(target FileEntry) int {
-	for i, f := range m.files {
-		if f.Path == target.Path {
-			return i
-		}
-	}
-	return 0
-}
-
-// visibleLines returns how many file lines can fit in the viewport.
+// visibleLines returns how many rows can fit in the viewport.
 func (m Model) visibleLines() int {
 	if m.height > 6 {
 		return m.height - 6
