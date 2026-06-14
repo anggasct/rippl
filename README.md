@@ -117,7 +117,9 @@ go install github.com/anggasct/rippl/cmd/rippl@v0.1.0
 
 ### First release bootstrap
 
-The initial manifest version is `0.1.0` (see [`.release-please-manifest.json`](.release-please-manifest.json)). After the CAP-910 launch PR merges to `main`, the first Release PR will propose `v0.1.0` (or the next semver if releasable commits warrant a bump).
+The initial manifest version is `0.1.0` (see [`.release-please-manifest.json`](.release-please-manifest.json)). The first Release PR may propose `v1.0.0` if releasable `feat` commits since bootstrap warrant a major/minor bump.
+
+**Repo setting (one-time):** In GitHub → Settings → Actions → General → Workflow permissions, enable **Allow GitHub Actions to create and approve pull requests** so release-please can open Release PRs automatically.
 
 `rippl version` prints `dev` when built from source without release ldflags.
 
