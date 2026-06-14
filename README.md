@@ -103,7 +103,7 @@ Rippl ships as a Go module — no separate release binaries. Version tags are cr
 
 ```bash
 go install github.com/anggasct/rippl/cmd/rippl@latest
-go install github.com/anggasct/rippl/cmd/rippl@v0.1.0
+go install github.com/anggasct/rippl/cmd/rippl@v1.0.0
 ```
 
 ### Semver mapping
@@ -117,9 +117,28 @@ go install github.com/anggasct/rippl/cmd/rippl@v0.1.0
 
 ### First release bootstrap
 
-The initial manifest version is `0.1.0` (see [`.release-please-manifest.json`](.release-please-manifest.json)). The first Release PR may propose `v1.0.0` if releasable `feat` commits since bootstrap warrant a major/minor bump.
+`v1.0.0` is the initial tagged release (see [CHANGELOG.md](CHANGELOG.md)).
 
-**Repo setting (one-time):** In GitHub → Settings → Actions → General → Workflow permissions, enable **Allow GitHub Actions to create and approve pull requests** so release-please can open Release PRs automatically.
+### Troubleshooting release-please
+
+**`GitHub Actions is not permitted to create or approve pull requests`**
+
+One-time repo setting (repo admin):
+
+1. GitHub → **Settings** → **Actions** → **General**
+2. Under **Workflow permissions**, choose **Read and write permissions**
+3. Enable **Allow GitHub Actions to create and approve pull requests**
+4. Re-run the failed **Release** workflow (or push a commit to `main`)
+
+**`Pull request body did not match` / release PR merged but no tag**
+
+Release PRs must be opened by release-please (bot), not created manually. If a Release PR was merged without the bot footer, create the tag manually:
+
+```bash
+gh release create vX.Y.Z --target <sha> --title "vX.Y.Z" --notes-file CHANGELOG.md
+```
+
+After `v1.0.0` exists, future `feat`/`fix` merges to `main` should only bump via bot-opened Release PRs.
 
 `rippl version` prints `dev` when built from source without release ldflags.
 
