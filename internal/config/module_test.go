@@ -62,3 +62,37 @@ func TestFindModuleRootNotFound(t *testing.T) {
 		t.Fatalf("FindModuleRoot() error = %v, want ErrNotGoModule", err)
 	}
 }
+
+func TestModulePath(t *testing.T) {
+	t.Parallel()
+
+	moduleRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(moduleRoot, "go.mod"), []byte("module example.com/test\n\ngo 1.22\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ModulePath(moduleRoot)
+	if err != nil {
+		t.Fatalf("ModulePath() error = %v", err)
+	}
+	if got != "example.com/test" {
+		t.Fatalf("ModulePath() = %q, want %q", got, "example.com/test")
+	}
+}
+
+func TestModulePathNoModuleDirective(t *testing.T) {
+	t.Parallel()
+
+	moduleRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(moduleRoot, "go.mod"), []byte("\ngo 1.22\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ModulePath(moduleRoot)
+	if err != nil {
+		t.Fatalf("ModulePath() error = %v", err)
+	}
+	if got != "" {
+		t.Fatalf("ModulePath() = %q, want empty", got)
+	}
+}
