@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/anggasct/rippl/compare/v0.1.1...v0.2.0) (2026-06-14)
+
+
+### Features
+
+* **cap-200:** add suggested_actions JSON and analyze filter flags ([#19](https://github.com/anggasct/rippl/issues/19)) ([d04f65d](https://github.com/anggasct/rippl/commit/d04f65dbd8eb6f0deb9b68aca657e0b4cbaef413))
+
 ## [0.1.1](https://github.com/anggasct/rippl/compare/v0.1.0...v0.1.1) (2026-06-14)
 
 
