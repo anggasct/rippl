@@ -2,3 +2,7 @@
 bin/
 /rippl
 /tmp/rippl
+
+# Local symlink to Obsidian vault (per-machine; see project-docs/bootstrap.md)
+project-docs
+AGENTS.md
